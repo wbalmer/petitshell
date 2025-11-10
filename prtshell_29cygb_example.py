@@ -46,7 +46,7 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 
 
 # general setup
-retrieval_name = '29cygb_shell_fixedrpi'
+retrieval_name = '29cygb_shell_actuallyfixedradiusbounds'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 
@@ -64,9 +64,9 @@ if __name__ == '__main__':
     time.sleep(rank)
     SpeciesInit()
 
-    data_path = './spectral_data/'
-    sdata = np.loadtxt(data_path+'hip99770b_charis_wm2um.dat', delimiter=',')
-    gdata = fits.getdata(data_path+'hip99770b_gravity.fits')
+    data_path = './example_data/'
+    sdata = np.loadtxt(data_path+'29cygb_charis_wm2um.dat', delimiter=',')
+    gdata = fits.getdata(data_path+'29cygb_gravity.fits')
     pdata = data_path+'29cygb_photometry.dat'
     
     sw = sdata[:,0]
@@ -492,10 +492,6 @@ if __name__ == '__main__':
     # prior.add_parameter('logg', dist=norm(loc=3.7, scale=0.1))
     
     prior.add_parameter('plx', dist=norm(loc=24.5456, scale=0.0911))
-
-    # prior.add_parameter('T_int', dist=(500, 1500))
-    # prior.add_parameter('kappa_ir', dist=(1e-3, 5e-1))
-    # prior.add_parameter('gamma', dist=(1e-3, 0.999))
 
     prior.add_parameter('T_bottom', dist=(2500, 25000))
     prior.add_parameter('dPT_1', dist=norm(loc=0.25, scale=0.025))

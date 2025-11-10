@@ -340,7 +340,7 @@ if __name__ == '__main__':
     
     mu_radius = 1.0
     sigma_radius = 0.1
-    a_radius, b_radius = (a - mu_radius) / sigma_radius, (b - mu_radius) / sigma_radius
+    a_radius, b_radius = (0.5 - mu_radius) / sigma_radius, (2.0 - mu_radius) / sigma_radius
     prior.add_parameter('R_pl', dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius))
     prior.add_parameter('logg', dist=(3.0, 6.0))
     
