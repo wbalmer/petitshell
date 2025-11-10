@@ -1,0 +1,7 @@
+# hip99770b photometry 
+# name, w_low, w_high, flux, error
+JWST/NIRCAM.F210M, 1.9618, 2.2337, 2.74e-16, 1.68e-17
+Keck/NIRC2.Lp, 3.33, 4.22, 8.22e-17, 9.10e-18
+JWST/NIRCAM.F410M, 3.7763, 4.4048, 9.34e-17, 4.97e-18
+JWST/NIRCAM.F430M, 4.1227, 4.4448, 5.58e-17, 4.24e-18
+JWST/NIRCAM.F460M, 4.4652, 4.8146, 3.97e-17, 3.58e-18
