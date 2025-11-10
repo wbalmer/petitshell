@@ -338,9 +338,11 @@ if __name__ == '__main__':
 
     prior = Prior()
     
-    prior.add_parameter('R_pl', dist=truncnorm(0.5, 2.0, loc=1.0, scale=0.1))
-    # prior.add_parameter('mass', dist=truncnorm(1e-1, 1e2, 3.75, scale=0.5))
-    prior.add_parameter('logg', dist=norm(loc=3.7, scale=0.1))
+    mu_radius = 1.0
+    sigma_radius = 0.1
+    a_radius, b_radius = (a - mu_radius) / sigma_radius, (b - mu_radius) / sigma_radius
+    prior.add_parameter('R_pl', dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius))
+    prior.add_parameter('logg', dist=(3.0, 6.0))
     
     prior.add_parameter('plx', dist=norm(loc=82.0248, scale=0.3583))
 
