@@ -1,5 +1,6 @@
 *.DS_Store
 *.hdf5
 *.png
+*.fits
 *outputs/*
 *species_config.ini
