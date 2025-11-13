@@ -46,14 +46,14 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 
 
 # general setup
-retrieval_name = '29cygb_shell_actuallyfixedradiusbounds'
+retrieval_name = '29cygb_shell_addcharis_fixcloud'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 
 # sampling parameters
 discard_exploration = False
 f_live = 0.01
-resume = True
+resume = False
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -66,12 +66,17 @@ if __name__ == '__main__':
 
     data_path = './example_data/'
     sdata = np.loadtxt(data_path+'29cygb_charis_wm2um.dat', delimiter=',')
+    hdata = np.loadtxt(data_path+'29cygb_charis_h-band_wm2um.dat', delimiter='\t')
     gdata = fits.getdata(data_path+'29cygb_gravity.fits')
     pdata = data_path+'29cygb_photometry.dat'
     
     sw = sdata[:,0]
     sf = sdata[:,1]
     sfe = sdata[:,2]
+    
+    hw = hdata[:,0]
+    hf = hdata[:,1]
+    hfe = hdata[:,2]
 
     gw = gdata['WAVELENGTH']
     gf = gdata['FLUX']
@@ -114,25 +119,40 @@ if __name__ == '__main__':
         # 'T_int':850,
         # 'T_eq':0.0,
 
+        # 'T_bottom':9000.,
+        # 'N_layers':6,
+        # 'dPT_6':0.07,
+        # 'dPT_5':0.10,
+        # 'dPT_4':0.18,
+        # 'dPT_3':0.27,
+        # 'dPT_2':0.24,
+        # 'dPT_1':0.25,
+        
         'T_bottom':9000.,
-        'N_layers':6,
-        'dPT_6':0.07,
-        'dPT_5':0.10,
-        'dPT_4':0.18,
-        'dPT_3':0.27,
-        'dPT_2':0.24,
-        'dPT_1':0.25,
+        'N_layers':10,
+        'dPT_10':0.05,
+        'dPT_9':0.05,
+        'dPT_8':0.05,
+        'dPT_7':0.06,
+        'dPT_6':0.08,
+        'dPT_5':0.16,
+        'dPT_4':0.21,
+        'dPT_3':0.18,
+        'dPT_2':0.15,
+        'dPT_1':0.15,
 
         'C/O':0.55,
         'Fe/H':0.5,
         'log_pquench':2.5,
         # 'C_iso':100,
-        'fsed':4,
+        # 'fsed':4,
+        'fsed_MgSiO3(s)_crystalline__DHS':4,
+        'fsed_Fe(s)_crystalline__DHS':4,
         'sigma_lnorm':1.5,
         'logKzz':10,
         # 'mmw':2.33,
-        'corr_len_sphere':-1, # log10 [-3, 0] 
-        'corr_amp_sphere':0.5 # [0, 1]
+        'corr_len_ch':-1, # log10 [-3, 0] 
+        'corr_amp_ch':0.5 # [0, 1]
     }
 
     def likelihood(param_dict, debug=False):
@@ -145,48 +165,59 @@ if __name__ == '__main__':
 
         w_i, f_i = spectrum_generator(params)
 
-        # compute sphere likelihood:
+        # do charis low res likelihood:
 
         rb_f_i = spectres(sw, w_i[0], f_i[0])
+        
+        chi2 = np.nansum(((sf - rb_f_i)/sfe)**2)
+        ln += -chi2/2 - np.nansum(np.log(2*np.pi*sfe**2)/2)
         
         if debug:
             plt.figure()
             plt.plot(sw, rb_f_i)
+            
+        # do charis h-band likelihood on same model
+        
+        rb_f_i = spectres(hw, w_i[0], f_i[0])
 
-        if 'corr_len_sphere' in param_dict.keys():
+        if 'corr_len_ch' in param_dict.keys():
             # from Wang et al. 2020, species.fit.fit_model
-            wavel_j, wavel_i = np.meshgrid(sw, sw)
+            wavel_j, wavel_i = np.meshgrid(hw, hw)
 
-            error_j, error_i = np.meshgrid(sfe, sfe)
+            error_j, error_i = np.meshgrid(hfe, hfe)
 
-            corr_len = 10.0 ** param_dict["corr_len_sphere"]  # (um)
-            corr_amp = param_dict["corr_amp_sphere"]
+            corr_len = 10.0 ** param_dict["corr_len_ch"]  # (um)
+            corr_amp = param_dict["corr_amp_ch"]
 
             cov_matrix = (
                 corr_amp**2
                 * error_i
                 * error_j
                 * np.exp(-((wavel_i - wavel_j) ** 2) / (2.0 * corr_len**2))
-                + (1.0 - corr_amp**2) * np.eye(sw.shape[0]) * error_i**2
+                + (1.0 - corr_amp**2) * np.eye(hw.shape[0]) * error_i**2
             )
 
-            ln_s = (
-                (sf - rb_f_i)
+            ln_h = (
+                (hf - rb_f_i)
                 @ np.linalg.inv(cov_matrix)
-                @ (sf - rb_f_i)
+                @ (hf - rb_f_i)
             )
 
-            ln_s += np.nansum(
-                np.log(2.0 * np.pi * sfe**2)
+            ln_h += np.nansum(
+                np.log(2.0 * np.pi * hfe**2)
             )
 
-            ln_s *= -0.5
+            ln_h *= -0.5
 
-            ln += ln_s
+            ln += ln_h
         
         else:
-            chi2 = np.nansum(((sf - rb_f_i)/sfe)**2)
-            ln += -chi2/2 - np.nansum(np.log(2*np.pi*sfe**2)/2)
+            chi2 = np.nansum(((hf - rb_f_i)/hfe)**2)
+            ln += -chi2/2 - np.nansum(np.log(2*np.pi*hfe**2)/2)
+        
+        if debug:
+            plt.figure()
+            plt.plot(hw, rb_f_i)
 
         # compute gravity likelihood
 
@@ -467,10 +498,13 @@ if __name__ == '__main__':
         t_end = time.time()
         print('Likelihood time: {:.1f}s'.format(t_end - t_start))
         s_test_f = spectres(sw, test_w[0], test_f[0])
-        plt.errorbar(sw, sf, yerr=sfe, label='sphere', marker='.', color='k', ls='none')
+        h_test_f = spectres(hw, test_w[0], test_f[0])
+        plt.errorbar(sw, sf, yerr=sfe, label='charis low', marker='.', color='k', ls='none')
+        plt.errorbar(hw, hf, yerr=hfe, label='charis h', marker='.', color='k', ls='none')
         g_test_f = spectres(gw, test_w[1], test_f[1])
         plt.errorbar(gw, gf, yerr=gfe, label='gravity', color='k', ls='none')
         plt.plot(sw, s_test_f, label=ln, color='red')
+        plt.plot(hw, h_test_f, color='red')
         plt.plot(gw, g_test_f, color='red')
         plt.errorbar(test_w[2], pfs, yerr=pfes, marker='o', color='k', label='photometry')
         plt.errorbar(test_w[2], test_f[2], marker='s', color='red')
@@ -494,12 +528,25 @@ if __name__ == '__main__':
     prior.add_parameter('plx', dist=norm(loc=24.5456, scale=0.0911))
 
     prior.add_parameter('T_bottom', dist=(2500, 25000))
-    prior.add_parameter('dPT_1', dist=norm(loc=0.25, scale=0.025))
-    prior.add_parameter('dPT_2', dist=norm(loc=0.25, scale=0.045))
-    prior.add_parameter('dPT_3', dist=norm(loc=0.26, scale=0.05))
-    prior.add_parameter('dPT_4', dist=norm(loc=0.2, scale=0.05))
-    prior.add_parameter('dPT_5', dist=norm(loc=0.12, scale=0.045))
-    prior.add_parameter('dPT_6', dist=norm(loc=0.07, scale=0.07))
+    # z23, combo of diff. grids from 10^-3 to 10^3
+    # prior.add_parameter('dPT_1', dist=norm(loc=0.25, scale=0.025))
+    # prior.add_parameter('dPT_2', dist=norm(loc=0.25, scale=0.045))
+    # prior.add_parameter('dPT_3', dist=norm(loc=0.26, scale=0.05))
+    # prior.add_parameter('dPT_4', dist=norm(loc=0.2, scale=0.05))
+    # prior.add_parameter('dPT_5', dist=norm(loc=0.12, scale=0.045))
+    # prior.add_parameter('dPT_6', dist=norm(loc=0.07, scale=0.07))
+
+    # z25, sonora diamondback for 2m1207b
+    prior.add_parameter('dPT_1', dist=(0.05, 0.25))
+    prior.add_parameter('dPT_2', dist=norm(loc=0.15, scale=0.01))
+    prior.add_parameter('dPT_3', dist=norm(loc=0.18, scale=0.04))
+    prior.add_parameter('dPT_4', dist=norm(loc=0.21, scale=0.05))
+    prior.add_parameter('dPT_5', dist=norm(loc=0.16, scale=0.06))
+    prior.add_parameter('dPT_6', dist=norm(loc=0.08, scale=0.025))
+    prior.add_parameter('dPT_7', dist=norm(loc=0.06, scale=0.02))
+    prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
+    prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
+    prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
     
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
@@ -512,19 +559,19 @@ if __name__ == '__main__':
     prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
     prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-4, 10))
     
-    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-10, 1))
-    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
+    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-3, 2))
+    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-3, 2))
     
     prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
     prior.add_parameter('logKzz', dist=(4, 14))
 
-    prior.add_parameter('corr_len_sphere', dist=(-3, 0))
-    prior.add_parameter('corr_amp_sphere', dist=(0, 1))
+    prior.add_parameter('corr_len_ch', dist=(-3, 0))
+    prior.add_parameter('corr_amp_ch', dist=(0, 1))
 
     # prior.add_parameter('rv', dist=(-1000, 1000))
 
 
-    n_live = 480
+    n_live = 960
 
     # run the sampler!
     # print(f'starting pool with {os.cpu_count()} cores')
@@ -575,10 +622,13 @@ if __name__ == '__main__':
         test_w, test_f = spectrum_generator(best_params)
         plt.figure()
         s_test_f = spectres(sw, test_w[0], test_f[0])
-        plt.errorbar(sw, sf, yerr=sfe, label='sphere', marker='.', color='k', ls='none')
+        h_test_f = spectres(hw, test_w[0], test_f[0])
+        plt.errorbar(sw, sf, yerr=sfe, label='charis low', marker='.', color='k', ls='none')
+        plt.errorbar(hw, hf, yerr=hfe, label='charis h', marker='.', color='k', ls='none')
         g_test_f = spectres(gw, test_w[1], test_f[1])
         plt.errorbar(gw, gf, yerr=gfe, label='gravity', color='k', ls='none')
         plt.plot(sw, s_test_f, label=ln, color='red')
+        plt.plot(hw, h_test_f, color='red')
         plt.plot(gw, g_test_f, color='red')
         plt.errorbar(test_w[2], pfs, yerr=pfes, marker='o', color='k', label='photometry')
         plt.errorbar(test_w[2], test_f[2], marker='s', color='red')

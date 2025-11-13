@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=ntls-29cygb  # Job name
-#SBATCH --output=29cygb_shell_actuallyfixedradiusbounds_outputs/output.txt          # Standard output file
-#SBATCH --error=29cygb_shell_actuallyfixedradiusbounds_outputs/error.txt            # Standard error file
+#SBATCH --output=29cygb_shell_addcharis_fixcloud_outputs/output.txt          # Standard output file
+#SBATCH --error=29cygb_shell_addcharis_fixcloud_outputs/error.txt            # Standard error file
 #SBATCH --partition=parallel	      # Partition or queue name
 #SBATCH --nodes=3                     # Number of nodes
 #SBATCH --ntasks-per-node=48          # Number of tasks per node
