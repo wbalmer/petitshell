@@ -322,10 +322,16 @@ if __name__ == '__main__':
         print(f'starting pool with {size} processes')
         comm.Barrier()
         with MPIPool() as pool:
+
+            if not pool.is_master():
+                pool.wait()
+                sys.exit(0)
             # "Static" nested sampling.
-            sampler = dynesty.NestedSampler(likelihood_dyn, prior_dyn, ndim)
+            sampler = dynesty.NestedSampler(likelihood_dyn, prior_dyn, ndim, pool=pool)
             t_start = time.time()
-            sampler.run_nested(dlogz=f_live, checkpoint_file=checkpoint_file.replace('.hdf5','.save'))
+            sampler.run_nested(dlogz=f_live, 
+                               checkpoint_file=checkpoint_file.replace('.hdf5','.save'),
+                               resume=resume)
             t_end = time.time()
             sresults = sampler.results    
 
