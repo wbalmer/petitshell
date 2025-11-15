@@ -49,12 +49,12 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 retrieval_name = '29cygb_shell_testolddtdp_freetop'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
-plot = False
+plot = True
 
 # sampling parameters
 discard_exploration = False
 f_live = 0.01
-resume = False
+resume = True
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)

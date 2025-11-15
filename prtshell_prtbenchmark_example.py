@@ -47,16 +47,19 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 
 
 # general setup
-retrieval_name = 'BENCH_FAKE_TEST'
+retrieval_name = 'BENCH_DYNESTY_LARGEPARAM'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 
 # sampling parameters
-n_live = 480
+n_live = 1000
 discard_exploration = False
 f_live = 0.05
+networks = 4
+
 resume = False
-dyn = True
+
+dyn = False
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -68,7 +71,8 @@ if __name__ == '__main__':
     # SpeciesInit()
 
     data_path = './example_data/'
-    data = np.loadtxt(data_path+'fake_data.txt')
+    # data = np.loadtxt(data_path+'fake_data.txt')
+    data = np.loadtxt(data_path+'fake_data_1-3mu.txt')
     
     w = data[:,0]
     f = data[:,1]
@@ -109,14 +113,14 @@ if __name__ == '__main__':
     prior.add_parameter('R_pl', dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius))
     prior.add_parameter('logg', dist=(3.0, 5.5))
     prior.add_parameter('plx', dist=norm(loc=10.0, scale=0.5))
-    # prior.add_parameter('kappa_ir', dist=(1e-3, 5e-1))
-    # prior.add_parameter('gamma', dist=(1e-3, 0.999))
-    # prior.add_parameter('T_int', dist=(500, 1500))
-    # prior.add_parameter('C/O', dist=(0.1, 1.0))
-    # prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
-    # prior.add_parameter('fsed', dist=(0.01, 10))
-    # prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
-    # prior.add_parameter('logKzz', dist=(4, 14))
+    prior.add_parameter('kappa_ir', dist=(1e-3, 5e-1))
+    prior.add_parameter('gamma', dist=(1e-3, 0.999))
+    prior.add_parameter('T_int', dist=(500, 1500))
+    prior.add_parameter('C/O', dist=(0.1, 1.0))
+    prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
+    prior.add_parameter('fsed', dist=(0.01, 10))
+    prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
+    prior.add_parameter('logKzz', dist=(4, 14))
 
     def likelihood_dyn(cube):
         w_i, f_i = spectrum_generator(cube)
@@ -157,7 +161,7 @@ if __name__ == '__main__':
     cloud_species = ['MgSiO3(s)_crystalline__DHS',
                      'Fe(s)_crystalline__DHS'] # these will be important for clouds
 
-    smresl = '1000' # model resolution, R=1000 c-k
+    smresl = '500' # model resolution, R=1000 c-k
     atmosphere = Radtrans(
         pressures = rtpressures,
         line_species = [i+f'.R{smresl}' for i in line_species],
@@ -173,42 +177,42 @@ if __name__ == '__main__':
             planet_radius = params['R_pl']* cst.r_jup_mean
             reference_gravity = 1e1**params['logg']
             parallax = params['plx']
-            infrared_mean_opacity = default_params['kappa_ir']
-            gamma = default_params['gamma']
-            intrinsic_temperature = default_params['T_int']
-            co_ratio = default_params['C/O']
-            feh = default_params['Fe/H']
-            fsed = default_params['fsed'] # global fsed for now
-            sigma_lnorm = default_params['sigma_lnorm']
-            logkzz = default_params['logKzz']
-            # infrared_mean_opacity = params['kappa_ir']
-            # gamma = params['gamma']
-            # intrinsic_temperature = params['T_int']
-            # co_ratio = params['C/O']
-            # feh = params['Fe/H']
-            # fsed = params['fsed'] # global fsed for now
-            # sigma_lnorm = params['sigma_lnorm']
-            # logkzz = params['logKzz']
+            # infrared_mean_opacity = default_params['kappa_ir']
+            # gamma = default_params['gamma']
+            # intrinsic_temperature = default_params['T_int']
+            # co_ratio = default_params['C/O']
+            # feh = default_params['Fe/H']
+            # fsed = default_params['fsed'] # global fsed for now
+            # sigma_lnorm = default_params['sigma_lnorm']
+            # logkzz = default_params['logKzz']
+            infrared_mean_opacity = params['kappa_ir']
+            gamma = params['gamma']
+            intrinsic_temperature = params['T_int']
+            co_ratio = params['C/O']
+            feh = params['Fe/H']
+            fsed = params['fsed'] # global fsed for now
+            sigma_lnorm = params['sigma_lnorm']
+            logkzz = params['logKzz']
         else:
             planet_radius = params[0]* cst.r_jup_mean
             reference_gravity = 1e1**params[1]
             parallax = params[2]
-            infrared_mean_opacity = default_params['kappa_ir']
-            gamma = default_params['gamma']
-            intrinsic_temperature = default_params['T_int']
-            co_ratio = default_params['C/O']
-            feh = default_params['Fe/H']
-            fsed = default_params['fsed'] # global fsed for now
-            sigma_lnorm = default_params['sigma_lnorm']
-            logkzz = default_params['logKzz']
-            # infrared_mean_opacity = params[3]
-            # gamma = params[4]
-            # intrinsic_temperature = params[5]
-            # co_ratio = params[6]
-            # feh = params[7]
-            # sigma_lnorm = params[8]
-            # logkzz = params[9]
-            # fsed = params[10] # global fsed for now
+            # infrared_mean_opacity = default_params['kappa_ir']
+            # gamma = default_params['gamma']
+            # intrinsic_temperature = default_params['T_int']
+            # co_ratio = default_params['C/O']
+            # feh = default_params['Fe/H']
+            # fsed = default_params['fsed'] # global fsed for now
+            # sigma_lnorm = default_params['sigma_lnorm']
+            # logkzz = default_params['logKzz']
+            infrared_mean_opacity = params[3]
+            gamma = params[4]
+            intrinsic_temperature = params[5]
+            co_ratio = params[6]
+            feh = params[7]
+            sigma_lnorm = params[8]
+            logkzz = params[9]
+            fsed = params[10] # global fsed for now
         
         pressures = atmosphere.pressures * 1e-6 # cgs to bar
         r2d2 = (planet_radius/(cst.pc/(parallax/1000)))**2
@@ -303,7 +307,7 @@ if __name__ == '__main__':
         plt.savefig(output_dir+'test_alldata_generation.png')
         
         # benchmark_model_spectrum = np.array([w,s_test_f,np.abs(np.random.normal(loc=np.nanmedian(s_test_f)/10, scale=s_test_f/100, size=len(w)))]).T
-        # np.savetxt('./example_data/fake_data.txt', benchmark_model_spectrum)
+        # np.savetxt('./example_data/fake_data_1-3mu.txt', benchmark_model_spectrum)
 
         ndim = prior.dimensionality()
         test_cube = np.ones(ndim) / 2
@@ -312,7 +316,6 @@ if __name__ == '__main__':
         print(test_cube)
         ln_test = likelihood_dyn(test_cube)
         print(ln_test)
-
 
     # run the sampler!
 
@@ -327,7 +330,17 @@ if __name__ == '__main__':
                 pool.wait()
                 sys.exit(0)
             # "Static" nested sampling.
-            sampler = dynesty.NestedSampler(likelihood_dyn, prior_dyn, ndim, pool=pool)
+            if resume:
+                sampler = dynesty.NestedSampler.restore(
+                    fname=checkpoint_file.replace('.hdf5','.save'),
+                    pool=pool,
+                )
+            else:
+                sampler = dynesty.NestedSampler(likelihood_dyn, 
+                                                prior_dyn,
+                                                ndim,
+                                                nlive=n_live,
+                                                pool=pool)
             t_start = time.time()
             sampler.run_nested(dlogz=f_live, 
                                checkpoint_file=checkpoint_file.replace('.hdf5','.save'),
@@ -340,15 +353,16 @@ if __name__ == '__main__':
 
             from dynesty import plotting as dyplot
 
-            lnz_truth = ndim * -np.log(2 * 10.)  # analytic evidence solution
-            fig, axes = dyplot.runplot(sresults, lnz_truth=lnz_truth)  # summary (run) plot
-            plt.savefig(output_dir+f'dyn_runplot_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
+            # fig, axes = dyplot.runplot(sresults)  # summary (run) plot
+            # plt.savefig(output_dir+f'dyn_runplot_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
+
+            print(np.array(list(default_params.items())))
 
             # plot extended run (res2; right)
-            fg, ax = dyplot.cornerplot(sresults, color='dodgerblue', truths=np.array(default_params.items()),
+            fg, ax = dyplot.cornerplot(sresults, color='dodgerblue', truths=np.array(list(default_params.items())),
                                        truth_color='black', show_titles=True,
-                                       quantiles=None, max_n_ticks=3,
-                                       fig=(fig, axes[:, 4:]))
+                                       quantiles=None, max_n_ticks=3
+                                       )
             plt.savefig(output_dir+f'dyn_cornerplot_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
 
             from dynesty import utils as dyfunc
@@ -362,7 +376,7 @@ if __name__ == '__main__':
         
             test_w, test_f = spectrum_generator(best_params)
             plt.figure()
-            s_test_f = spectres(w, test_w[0], test_f[0])
+            s_test_f = spectres(w, test_w, test_f)
             plt.errorbar(w, f, yerr=fe, label='jwst', marker='.', color='k', ls='none')
             plt.plot(w, s_test_f, label=ln, color='red')
             plt.legend()
@@ -383,7 +397,7 @@ if __name__ == '__main__':
                             n_live=n_live,
                             filepath=checkpoint_file,
                             pool=pool,
-                            n_networks=4,
+                            n_networks=networks,
                             resume=resume
                             )
             t_start = time.time()
@@ -418,7 +432,7 @@ if __name__ == '__main__':
         
             test_w, test_f = spectrum_generator(best_params)
             plt.figure()
-            s_test_f = spectres(w, test_w[0], test_f[0])
+            s_test_f = spectres(w, test_w, test_f)
             plt.errorbar(w, f, yerr=fe, label='jwst', marker='.', color='k', ls='none')
             plt.plot(w, s_test_f, label=ln, color='red')
             plt.legend()
