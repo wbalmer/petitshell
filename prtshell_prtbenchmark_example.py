@@ -39,7 +39,7 @@ rank = comm.Get_rank()
 
 # prt specific imports
 from petitRADTRANS import physical_constants as cst
-from petitRADTRANS.physics import temperature_profile_function_guillot_global, dtdp_temperature_profile
+from petitRADTRANS.physics import temperature_profile_function_ret_model, dtdp_temperature_profile
 from petitRADTRANS.radtrans import Radtrans # <--- this is our "spectrum generator," e.g. the radiative transfer solver
 from petitRADTRANS.chemistry.pre_calculated_chemistry import PreCalculatedEquilibriumChemistryTable
 from petitRADTRANS.chemistry.clouds import return_cloud_mass_fraction, simple_cdf
@@ -59,7 +59,7 @@ networks = 4
 
 resume = False
 
-dyn = False
+dyn = True
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -67,7 +67,7 @@ Path(output_dir).mkdir(parents=True, exist_ok=True)
 
 if __name__ == '__main__':
     # load data, start species if needed for photometry
-    # time.sleep(rank) # sleeping here to avoid two processes trying to write to species.ini at the same time
+    time.sleep(rank) # sleeping here to avoid two processes trying to read/write to init files at the same time
     # SpeciesInit()
 
     data_path = './example_data/'
@@ -85,13 +85,17 @@ if __name__ == '__main__':
         'logg':4.0,
         'plx':10.0,
 
-        'kappa_ir':0.01,
-        'gamma':0.4,
-        'T_int':850,
+        'T_int':1200,
+        'T1':0.5,
+        'T2':0.5,
+        'T3':0.5,
+        'log_delta':0.7,
+        'alpha':1.5,
 
         'C/O':0.55,
         'Fe/H':0.0,
-        'fsed':4,
+        'log_pquench':1.0,
+        'fsed':1,
         'sigma_lnorm':1.5,
         'logKzz':10,
     }
@@ -113,11 +117,17 @@ if __name__ == '__main__':
     prior.add_parameter('R_pl', dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius))
     prior.add_parameter('logg', dist=(3.0, 5.5))
     prior.add_parameter('plx', dist=norm(loc=10.0, scale=0.5))
-    prior.add_parameter('kappa_ir', dist=(1e-3, 5e-1))
-    prior.add_parameter('gamma', dist=(1e-3, 0.999))
+    
+    prior.add_parameter('T3', dist=(0, 500))
+    prior.add_parameter('T2', dist=(100, 600))
+    prior.add_parameter('T1', dist=(200, 700))
     prior.add_parameter('T_int', dist=(500, 1500))
+    prior.add_parameter('log_delta', dist=(0, 1))
+    prior.add_parameter('alpha', dist=(1, 2))
+    
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
+    prior.add_parameter('log_pquench', dist=(-3,3))
     prior.add_parameter('fsed', dist=(0.01, 10))
     prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
     prior.add_parameter('logKzz', dist=(4, 14))
@@ -137,6 +147,7 @@ if __name__ == '__main__':
 
 
     chem = PreCalculatedEquilibriumChemistryTable()
+    chem.load()
     # Load scattering version of pRT
 
     rtpressures = np.logspace(-6, 3, 100) # set pressure range
@@ -161,7 +172,7 @@ if __name__ == '__main__':
     cloud_species = ['MgSiO3(s)_crystalline__DHS',
                      'Fe(s)_crystalline__DHS'] # these will be important for clouds
 
-    smresl = '500' # model resolution, R=1000 c-k
+    smresl = '1000' # model resolution, R=1000 c-k
     atmosphere = Radtrans(
         pressures = rtpressures,
         line_species = [i+f'.R{smresl}' for i in line_species],
@@ -177,19 +188,17 @@ if __name__ == '__main__':
             planet_radius = params['R_pl']* cst.r_jup_mean
             reference_gravity = 1e1**params['logg']
             parallax = params['plx']
-            # infrared_mean_opacity = default_params['kappa_ir']
-            # gamma = default_params['gamma']
-            # intrinsic_temperature = default_params['T_int']
-            # co_ratio = default_params['C/O']
-            # feh = default_params['Fe/H']
-            # fsed = default_params['fsed'] # global fsed for now
-            # sigma_lnorm = default_params['sigma_lnorm']
-            # logkzz = default_params['logKzz']
-            infrared_mean_opacity = params['kappa_ir']
-            gamma = params['gamma']
+            
+            t3 = params['T3']
+            t2 = params['T2']
+            t1 = params['T1']
             intrinsic_temperature = params['T_int']
+            log_delta = params['log_delta']
+            alpha = params['alpha']
+            
             co_ratio = params['C/O']
             feh = params['Fe/H']
+            log_pquench = params['log_pquench']
             fsed = params['fsed'] # global fsed for now
             sigma_lnorm = params['sigma_lnorm']
             logkzz = params['logKzz']
@@ -197,44 +206,52 @@ if __name__ == '__main__':
             planet_radius = params[0]* cst.r_jup_mean
             reference_gravity = 1e1**params[1]
             parallax = params[2]
-            # infrared_mean_opacity = default_params['kappa_ir']
-            # gamma = default_params['gamma']
-            # intrinsic_temperature = default_params['T_int']
-            # co_ratio = default_params['C/O']
-            # feh = default_params['Fe/H']
-            # fsed = default_params['fsed'] # global fsed for now
-            # sigma_lnorm = default_params['sigma_lnorm']
-            # logkzz = default_params['logKzz']
-            infrared_mean_opacity = params[3]
-            gamma = params[4]
-            intrinsic_temperature = params[5]
-            co_ratio = params[6]
-            feh = params[7]
-            sigma_lnorm = params[8]
-            logkzz = params[9]
-            fsed = params[10] # global fsed for now
+            
+            t3 = params[3]
+            t2 = params[4]
+            t1 = params[5]
+            intrinsic_temperature = params[6]
+            log_delta = params[7]
+            alpha = params[8]
+            
+            co_ratio = params[9]
+            feh = params[10]
+            log_pquench = params[11]
+            fsed = params[12] # global fsed for now
+            sigma_lnorm = params[13]
+            logkzz = params[14]
         
         pressures = atmosphere.pressures * 1e-6 # cgs to bar
         r2d2 = (planet_radius/(cst.pc/(parallax/1000)))**2
 
         # P-T
-        temperature = temperature_profile_function_guillot_global(
-            pressures=pressures,
-            infrared_mean_opacity=infrared_mean_opacity,
-            gamma=gamma,
-            gravities=reference_gravity,
-            intrinsic_temperature=intrinsic_temperature,
-            equilibrium_temperature=0.0 # we're doing pure emission here no star
-        )
+        # Priors for these parameters are implemented here, as they depend on each other
+        t3 = ((3. / 4. * intrinsic_temperature ** 4. * (0.1 + 2. / 3.)) ** 0.25) * (1.0 - t3)
+        t2 = t3 * (1.0 - t2)
+        t1 = t2 * (1.0 - t1)
+        delta = ((10.0 ** (-3.0 + 5.0 * log_delta)) * 1e6) ** (-alpha)
+
+        rad_trans_params = [
+            np.array([t1,t2,t3]),
+            delta,
+            alpha,
+            intrinsic_temperature,
+            pressures,
+            True,
+            co_ratio,
+            feh
+        ]
+        temperature = temperature_profile_function_ret_model(rad_trans_params)
 
         co_ratios = co_ratio * np.ones_like(pressures)
         log10_metallicities = feh * np.ones_like(pressures)
-
+        
         mass_fractions, mean_molar_masses, nabla_ad = chem.interpolate_mass_fractions(
             co_ratios=co_ratios,
             log10_metallicities=log10_metallicities,
             temperatures=temperature,
             pressures=pressures,
+            carbon_pressure_quench=10**log_pquench,
             full=True
         )
 
@@ -301,21 +318,31 @@ if __name__ == '__main__':
         t_end = time.time()
         print('Likelihood time: {:.1f}s'.format(t_end - t_start))
         s_test_f = spectres(w, test_w, test_f)
-        plt.errorbar(w, f, yerr=fe, label='jwst', marker='.', color='k', ls='none')
+        plt.errorbar(w, f, yerr=np.abs(fe), label='jwst', marker='.', color='k', ls='none')
         plt.plot(w, s_test_f, label=ln, color='red')
         plt.legend()
         plt.savefig(output_dir+'test_alldata_generation.png')
         
-        # benchmark_model_spectrum = np.array([w,s_test_f,np.abs(np.random.normal(loc=np.nanmedian(s_test_f)/10, scale=s_test_f/100, size=len(w)))]).T
+        # generate fake spectra
+        # snr = 10
+        # noise_sim = np.abs(s_test_f/snr)
+        
+        # benchmark_model_spectrum = np.array([w,s_test_f,noise_sim]).T
         # np.savetxt('./example_data/fake_data_1-3mu.txt', benchmark_model_spectrum)
+        
+        # plt.figure()
+        # plt.errorbar(benchmark_model_spectrum[:,0], benchmark_model_spectrum[:,1], yerr=benchmark_model_spectrum[:,2], label=f'fake data snr={snr}', marker='.', color='k', ls='none')
+        # plt.legend()
+        # plt.savefig(output_dir+'test_fakedata_generation.png')
+        
 
-        ndim = prior.dimensionality()
-        test_cube = np.ones(ndim) / 2
-        print(test_cube)
-        test_cube = prior_dyn(test_cube)
-        print(test_cube)
-        ln_test = likelihood_dyn(test_cube)
-        print(ln_test)
+        # ndim = prior.dimensionality()
+        # test_cube = np.ones(ndim) / 2
+        # print(test_cube)
+        # test_cube = prior_dyn(test_cube)
+        # print(test_cube)
+        # ln_test = likelihood_dyn(test_cube)
+        # print(ln_test)
 
     # run the sampler!
 
@@ -326,23 +353,26 @@ if __name__ == '__main__':
         comm.Barrier()
         with MPIPool() as pool:
 
-            if not pool.is_master():
-                pool.wait()
-                sys.exit(0)
+            # if not pool.is_master():
+            #     pool.wait()
+            #     sys.exit(0)
             # "Static" nested sampling.
             if resume:
-                sampler = dynesty.NestedSampler.restore(
+                sampler = dynesty.DynamicNestedSampler.restore(
                     fname=checkpoint_file.replace('.hdf5','.save'),
                     pool=pool,
                 )
             else:
-                sampler = dynesty.NestedSampler(likelihood_dyn, 
-                                                prior_dyn,
-                                                ndim,
-                                                nlive=n_live,
-                                                pool=pool)
+                sampler = dynesty.DynamicNestedSampler(likelihood_dyn, 
+                                                       prior_dyn,
+                                                       ndim,
+                                                       sample='unif',
+                                                       pool=pool)
             t_start = time.time()
-            sampler.run_nested(dlogz=f_live, 
+            sampler.run_nested(
+                               n_effective=10000,
+                               nlive_init=n_live,
+                               dlogz_init=f_live, 
                                checkpoint_file=checkpoint_file.replace('.hdf5','.save'),
                                resume=resume)
             t_end = time.time()
@@ -359,8 +389,8 @@ if __name__ == '__main__':
             print(np.array(list(default_params.items())))
 
             # plot extended run (res2; right)
-            fg, ax = dyplot.cornerplot(sresults, color='dodgerblue', truths=np.array(list(default_params.items())),
-                                       truth_color='black', show_titles=True,
+            fg, ax = dyplot.cornerplot(sresults, color='dodgerblue', truths=list(default_params.items()),
+                                       truth_color='black', show_titles=True, labels=list(default_params.keys()),
                                        quantiles=None, max_n_ticks=3
                                        )
             plt.savefig(output_dir+f'dyn_cornerplot_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
@@ -368,17 +398,21 @@ if __name__ == '__main__':
             from dynesty import utils as dyfunc
 
             samples, weights = sresults.samples, sresults.importance_weights()
-            mean, cov = dyfunc.mean_and_cov(samples, weights)
+            median = np.median(samples, axis=0)
+            quant = np.quantile(samples, [0.1587, 0.8413], axis=0)
 
             sresults.summary()
         
-            best_params = mean
+            best_params = median
+            print(best_params)
         
             test_w, test_f = spectrum_generator(best_params)
+            print('test w is', test_w)
+            print('test f is', test_f)
             plt.figure()
             s_test_f = spectres(w, test_w, test_f)
             plt.errorbar(w, f, yerr=fe, label='jwst', marker='.', color='k', ls='none')
-            plt.plot(w, s_test_f, label=ln, color='red')
+            plt.plot(test_w, test_f, label=ln, color='red')
             plt.legend()
             plt.savefig(output_dir+f'dyn_best_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
 

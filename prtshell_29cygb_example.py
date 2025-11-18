@@ -46,7 +46,7 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 
 
 # general setup
-retrieval_name = '29cygb_shell_testolddtdp_freetop'
+retrieval_name = '29cygb_shell_testeqchem'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 plot = True
@@ -54,7 +54,7 @@ plot = True
 # sampling parameters
 discard_exploration = False
 f_live = 0.01
-resume = True
+resume = False
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -144,7 +144,7 @@ if __name__ == '__main__':
 
         'C/O':0.55,
         'Fe/H':0.5,
-        'log_pquench':2.5,
+        # 'log_pquench':2.5,
         # 'C_iso':100,
         # 'fsed':4,
         'fsed_MgSiO3(s)_crystalline__DHS':1,
@@ -263,6 +263,7 @@ if __name__ == '__main__':
 
 
     chem = PreCalculatedEquilibriumChemistryTable()
+    chem.load()
     # Load scattering version of pRT
 
     rtpressures = np.logspace(-6, 3, 100) # set pressure range
@@ -367,7 +368,10 @@ if __name__ == '__main__':
 
         co_ratio = params['C/O']
         feh = params['Fe/H']
-        log_pquench = params['log_pquench']
+        if 'log_pquench' in params.keys():
+            carbon_pressure_quench = 10**params['log_pquench']
+        else:
+            carbon_pressure_quench = None
 
         co_ratios = co_ratio * np.ones_like(pressures)
         log10_metallicities = feh * np.ones_like(pressures)
@@ -377,7 +381,7 @@ if __name__ == '__main__':
             log10_metallicities=log10_metallicities,
             temperatures=temperature,
             pressures=pressures,
-            carbon_pressure_quench=10**log_pquench,
+            carbon_pressure_quench=carbon_pressure_quench,
             full=True
         )
 
@@ -597,17 +601,14 @@ if __name__ == '__main__':
     
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
-    # prior.add_parameter('C/O', dist=norm(loc=0.55, scale=0.05))
-    # prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
     prior.add_parameter('log_pquench', dist=(-3, 3))
-    # prior.add_parameter('C_iso', dist=(10, 200))
 
     # prior.add_parameter('fsed', dist=(0.01, 10))
     prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-3, 10))
     prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-3, 10))
     
-    # prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-3.5, 1))
-    # prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-3.5, 1))
+    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-3.5, 1))
+    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-3.5, 1))
     
     prior.add_parameter('sigma_lnorm', dist=(1.05, 3))
     prior.add_parameter('logKzz', dist=(4, 14))

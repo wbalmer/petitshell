@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=ntls-test  # Job name
-#SBATCH --output=BENCH_DYNESTY_LARGEPARAM_outputs/output_naut.txt          # Standard output file
-#SBATCH --error=BENCH_DYNESTY_LARGEPARAM_outputs/error_naut.txt            # Standard error file
+#SBATCH --job-name=dyn-test  # Job name
+#SBATCH --output=BENCH_DYNESTY_LARGEPARAM_outputs/output_dynesty_dynamic.txt          # Standard output file
+#SBATCH --error=BENCH_DYNESTY_LARGEPARAM_outputs/error_dynesty_dynamic.txt            # Standard error file
 #SBATCH --partition=parallel	      # Partition or queue name
 #SBATCH --nodes=3                     # Number of nodes
 #SBATCH --ntasks-per-node=48          # Number of tasks per node
