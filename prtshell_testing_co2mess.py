@@ -127,11 +127,11 @@ if __name__ == '__main__':
 
         'C/O':0.55,
         'Fe/H':0.75,
-        'log_pquench':1.0,
+        'log_Kzz_chem':10,
         # 'C_iso':100,
         'fsed':4,
         'sigma_lnorm':1.5,
-        'logKzz':10,
+        'log_Kzz_cloud':10,
         # 'mmw':2.33,
         'corr_len_sphere':-1, # log10 [-3, 0] 
         'corr_amp_sphere':0.5 # [0, 1]
@@ -325,7 +325,7 @@ if __name__ == '__main__':
 
         co_ratio = params['C/O']
         feh = params['Fe/H']
-        log_pquench = params['log_pquench']
+        log_Kzz_chem = params['log_Kzz_chem']
 
         co_ratios = co_ratio * np.ones_like(pressures)
         log10_metallicities = feh * np.ones_like(pressures)
@@ -335,7 +335,45 @@ if __name__ == '__main__':
             log10_metallicities=log10_metallicities,
             temperatures=temperature,
             pressures=pressures,
-            carbon_pressure_quench=10**log_pquench,
+            # carbon_pressure_quench=10**log_pquench,
+            full=True
+        )
+
+        # Pressure scale height (m)
+        h_scale = cst.kB * temperature / (mean_molar_masses * cst.amu * reference_gravity)
+
+        # Diffusion coefficient (m2 s-1)
+        chem_kzz = 10.0**log_Kzz_chem
+
+        # Mixing timescale (s)
+        t_mix = h_scale**2 / chem_kzz
+
+        # Chemical timescale (see Eq. 12 from Zahnle & Marley 2014)
+        metal = 10.0**log10_metallicities
+        t_chem_co = 1.5e-6 * pressures**-1.0 * metal**-0.7 * np.exp(42000.0 / temperature)
+
+        # Determine pressure at which t_mix = t_chem
+
+        t_diff = t_mix - t_chem_co
+        diff_product = t_diff[1:] * t_diff[:-1]
+
+        # If t_mix and t_chem intersect then there
+        # is 1 negative value in diff_product
+        indices = diff_product < 0.0
+
+        if np.sum(indices) == 1:
+            p_quench = (pressures[1:] + pressures[:-1])[indices] / 2.0
+            p_quench = p_quench[0]
+
+        elif np.sum(indices) == 0:
+            p_quench = None
+
+        mass_fractions, mean_molar_masses, nabla_ad = chem.interpolate_mass_fractions(
+            co_ratios=co_ratios,
+            log10_metallicities=log10_metallicities,
+            temperatures=temperature,
+            pressures=pressures,
+            carbon_pressure_quench=p_quench,
             full=True
         )
 
@@ -344,7 +382,7 @@ if __name__ == '__main__':
 
         if quench_co2_off_co:
             # vmrs = mf2vmr(mass_fractions, mean_molar_masses)
-            quench_idx = pressures <= 10**log_pquench
+            quench_idx = pressures <= p_quench
             # vmr_h2 = vmrs['H2'][quench_idx]
             # vmr_co = vmrs['CO'][quench_idx]
             # vmr_h2o = vmrs['H2O'][quench_idx]
@@ -382,13 +420,13 @@ if __name__ == '__main__':
             mass_fractions['12CO'] = mass_fractions['CO']-mass_fractions['13CO']
 
         sigma_lnorm = params['sigma_lnorm']
-        logkzz = params['logKzz']
+        log_kzz_cloud = params['log_Kzz_cloud']
 
         # mmw = params['mmw'] # we get mean_molar_masses from chem.interpolate instead of setting it ourselves
         # mean_molar_masses = mmw * np.ones_like(temperature)
         mmw = np.mean(mean_molar_masses)
 
-        eddy_diffusion_coefficients = np.ones_like(temperature)*1e1**logkzz
+        eddy_diffusion_coefficients = np.ones_like(temperature)*1e1**log_kzz_cloud
         if 'fsed' not in params.keys():
             cloud_f_sed = {}
             for specie in atmosphere_sphere.cloud_species:
@@ -551,7 +589,7 @@ if __name__ == '__main__':
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
     # prior.add_parameter('C/O', dist=norm(loc=0.55, scale=0.05))
     # prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
-    prior.add_parameter('log_pquench', dist=(-3, 3))
+    prior.add_parameter('log_kzz_chem', dist=(4, 14))
     # prior.add_parameter('C_iso', dist=(10, 200))
 
     # prior.add_parameter('fsed', dist=(0.01, 10))
@@ -562,7 +600,7 @@ if __name__ == '__main__':
     prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
     
     prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
-    prior.add_parameter('logKzz', dist=(4, 14))
+    prior.add_parameter('log_kzz_cloud', dist=(4, 14))
 
     prior.add_parameter('corr_len_sphere', dist=(-3, 0))
     prior.add_parameter('corr_amp_sphere', dist=(0, 1))
