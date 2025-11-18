@@ -237,6 +237,7 @@ if __name__ == '__main__':
 
 
     chem = PreCalculatedEquilibriumChemistryTable()
+    chem.load()
     # Load scattering version of pRT
 
     rtpressures = np.logspace(-6, 3, 100) # set pressure range
@@ -263,7 +264,7 @@ if __name__ == '__main__':
     cloud_species = ['MgSiO3(s)_crystalline__DHS',
                     'Fe(s)_crystalline__DHS'] # these will be important for clouds
 
-    smresl = '1000' # sphere model resolution, R=160 c-k
+    smresl = '160' # sphere model resolution, R=160 c-k
     atmosphere_sphere = Radtrans(
         pressures = rtpressures,
         line_species = [i+f'.R{smresl}' for i in line_species],
@@ -286,7 +287,7 @@ if __name__ == '__main__':
     )
 
     atmosphere_photometrys = []
-    ptmresl = '1000' # photometry model resolution, R=40 c-k
+    ptmresl = '40' # photometry model resolution, R=40 c-k
     for i,filt in enumerate(pnames):
         atmosphere_phot_i = Radtrans(
             pressures = rtpressures,
@@ -375,31 +376,34 @@ if __name__ == '__main__':
         elif np.sum(indices) == 0:
             p_quench = None
 
-        mass_fractions, mean_molar_masses, nabla_ad = chem.interpolate_mass_fractions(
-            co_ratios=co_ratios,
-            log10_metallicities=log10_metallicities,
-            temperatures=temperature,
-            pressures=pressures,
-            carbon_pressure_quench=p_quench,
-            full=True
-        )
+        if p_quench is not None:
+
+            mass_fractions, mean_molar_masses, nabla_ad = chem.interpolate_mass_fractions(
+                co_ratios=co_ratios,
+                log10_metallicities=log10_metallicities,
+                temperatures=temperature,
+                pressures=pressures,
+                carbon_pressure_quench=p_quench,
+                full=True
+            )
 
         if debug_abund:
             mf_orig = copy.deepcopy(mass_fractions)
 
         if quench_co2_off_co:
-            # vmrs = mf2vmr(mass_fractions, mean_molar_masses)
-            quench_idx = pressures <= p_quench
-            # vmr_h2 = vmrs['H2'][quench_idx]
-            # vmr_co = vmrs['CO'][quench_idx]
-            # vmr_h2o = vmrs['H2O'][quench_idx]
-            mf_h2 = mass_fractions['H2'][quench_idx]
-            mf_co = mass_fractions['CO'][quench_idx]
-            mf_h2o = mass_fractions['H2O'][quench_idx]
-            Keq = 18.3*np.exp((-2376/temperature[quench_idx]) - ((932/temperature[quench_idx])**2))
-            # vmrs['CO2'][quench_idx] = Keq * (vmr_co * vmr_h2o)/(vmr_h2)
-            # mass_fractions = mf2vmr(vmrs, mean_molar_masses)
-            mass_fractions['CO2'][quench_idx] = (mf_co * mf_h2o)/(mf_h2 * Keq)
+            if p_quench is not None:
+                # vmrs = mf2vmr(mass_fractions, mean_molar_masses)
+                quench_idx = pressures <= p_quench
+                # vmr_h2 = vmrs['H2'][quench_idx]
+                # vmr_co = vmrs['CO'][quench_idx]
+                # vmr_h2o = vmrs['H2O'][quench_idx]
+                mf_h2 = mass_fractions['H2'][quench_idx]
+                mf_co = mass_fractions['CO'][quench_idx]
+                mf_h2o = mass_fractions['H2O'][quench_idx]
+                Keq = 18.3*np.exp((-2376/temperature[quench_idx]) - ((932/temperature[quench_idx])**2))
+                # vmrs['CO2'][quench_idx] = Keq * (vmr_co * vmr_h2o)/(vmr_h2)
+                # mass_fractions = mf2vmr(vmrs, mean_molar_masses)
+                mass_fractions['CO2'][quench_idx] = (mf_co * mf_h2o)/(mf_h2 * Keq)
 
         if debug_abund:
             mf_list = ['H2', 'H2O', 'CO', 'CH4', 'CO2']
