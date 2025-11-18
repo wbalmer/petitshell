@@ -48,7 +48,7 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 
 
 # general setup
-retrieval_name = '29cygb_shell_actuallyfixedradiusbounds'
+retrieval_name = '29cygb_shell_testkzzco2'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 
@@ -116,14 +116,18 @@ if __name__ == '__main__':
         # 'T_int':850,
         # 'T_eq':0.0,
 
-        'T_bottom':9000.,
-        'N_layers':6,
-        'dPT_6':0.07,
-        'dPT_5':0.10,
-        'dPT_4':0.18,
-        'dPT_3':0.27,
-        'dPT_2':0.24,
-        'dPT_1':0.25,
+        'T_bottom':6000.,
+        'N_layers':10,
+        'dPT_10':0.05,
+        'dPT_9':0.05,
+        'dPT_8':0.05,
+        'dPT_7':0.06,
+        'dPT_6':0.08,
+        'dPT_5':0.16,
+        'dPT_4':0.21,
+        'dPT_3':0.18,
+        'dPT_2':0.15,
+        'dPT_1':0.20,
 
         'C/O':0.55,
         'Fe/H':0.75,
@@ -296,7 +300,7 @@ if __name__ == '__main__':
         atmosphere_photometrys.append(atmosphere_phot_i)
 
 
-    def spectrum_generator(params, quench_co2_off_co=False, debug_abund=False):
+    def spectrum_generator(params, quench_co2_off_co=True, debug_abund=False, return_extras=False):
         planet_radius = params['R_pl']* cst.r_jup_mean
         parallax = params['plx']
         r2d2 = (planet_radius/(cst.pc/(parallax/1000)))**2
@@ -338,6 +342,9 @@ if __name__ == '__main__':
             # carbon_pressure_quench=10**log_pquench,
             full=True
         )
+
+        if debug_abund:
+            mf_eqchem = copy.deepcopy(mass_fractions)
 
         # Pressure scale height (m)
         h_scale = cst.kB * temperature / (mean_molar_masses * cst.amu * reference_gravity)
@@ -392,7 +399,7 @@ if __name__ == '__main__':
             Keq = 18.3*np.exp((-2376/temperature[quench_idx]) - ((932/temperature[quench_idx])**2))
             # vmrs['CO2'][quench_idx] = Keq * (vmr_co * vmr_h2o)/(vmr_h2)
             # mass_fractions = mf2vmr(vmrs, mean_molar_masses)
-            mass_fractions['CO2'][quench_idx] = (mf_co * mf_h2o)/(mf_h2* Keq)
+            mass_fractions['CO2'][quench_idx] = (mf_co * mf_h2o)/(mf_h2 * Keq)
 
         if debug_abund:
             mf_list = ['H2', 'H2O', 'CO', 'CH4', 'CO2']
@@ -404,13 +411,17 @@ if __name__ == '__main__':
                     if key == 'CO2':
                         plt.plot(mass_fractions[key], pressures, label=key, color='k', ls='--')
                         plt.plot(mf_orig[key], pressures, color='k')
+                        plt.plot(mf_eqchem[key], pressures, color='k', alpha=0.5)
+                        
                     else:
                         i += 1
                         plt.plot(mass_fractions[key], pressures, label=key, ls='--', color=mf_colors[i])
                         plt.plot(mf_orig[key], pressures, color=mf_colors[i])
+                        plt.plot(mf_eqchem[key], pressures, color=mf_colors[i], alpha=0.5)
             plt.legend()
             plt.xscale('log')
             plt.yscale('log')
+            plt.xlim(1e-8, 5e-1)
             plt.ylim(1e3, 1e-6)
             plt.savefig(output_dir+'debug_abund.png')
 
@@ -519,20 +530,10 @@ if __name__ == '__main__':
         wavelengths = [wavelengths_sphere*1e4, wavelengths_gravity*1e4, phot_wavels]
         flux = [flux_sphere * r2d2 * unit_conv, flux_gravity * r2d2 * unit_conv, phot_fluxes]
 
-        # wavelengths = np.concatenate((wavelengths_sphere, wavelengths_gravity), axis=0)
-        # flux = np.concatenate((flux_sphere, flux_gravity), axis=0)
-
-        # wavelengths *= 1e4 # to micron
-
-        # if 'rv' in params.keys():
-        #     # apply RV shift
-        #     radial_velocity = params['rv'] * 1e5
-        #     # rv in km/s -> 1e5 to cm/s, cst.c in cm/s, wlen first in cm -> micron by 1e4
-            
-        #     wavelengths *= np.sqrt((1 + radial_velocity/cst.c)/(1- radial_velocity/cst.c))
-
-        # return wavelengths, flux * r2d2 * unit_conv
-        return wavelengths, flux
+        if return_extras:
+            return wavelengths, flux, pressures, temperature, mass_fractions, additional_returned_quantities['emission_contribution']
+        else:
+            return wavelengths, flux
 
     if rank==0:
         t_start = time.time()
@@ -554,9 +555,10 @@ if __name__ == '__main__':
         plt.legend()
         plt.savefig(output_dir+'test_alldata_generation.png')
 
+        test_w, test_f_noqco2 = spectrum_generator(default_params, quench_co2_off_co=False, debug_abund=True)
         test_w, test_f_qco2 = spectrum_generator(default_params, quench_co2_off_co=True, debug_abund=True)
         plt.figure()
-        plt.plot(test_w[2], test_f[2])
+        plt.plot(test_w[2], test_f_noqco2[2])
         plt.plot(test_w[2], test_f_qco2[2])
         plt.xlim(3.5, 5.5)
         plt.savefig(output_dir+'test_co2_quench.png')
@@ -584,13 +586,13 @@ if __name__ == '__main__':
     prior.add_parameter('dPT_4', dist=norm(loc=0.2, scale=0.05))
     prior.add_parameter('dPT_5', dist=norm(loc=0.12, scale=0.045))
     prior.add_parameter('dPT_6', dist=norm(loc=0.07, scale=0.07))
+    prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
+    prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
+    prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
     
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
-    # prior.add_parameter('C/O', dist=norm(loc=0.55, scale=0.05))
-    # prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
     prior.add_parameter('log_kzz_chem', dist=(4, 14))
-    # prior.add_parameter('C_iso', dist=(10, 200))
 
     # prior.add_parameter('fsed', dist=(0.01, 10))
     prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
@@ -656,7 +658,7 @@ if __name__ == '__main__':
         for i,param in enumerate(prior.keys):
             best_params[param] = best[i]
     
-        test_w, test_f = spectrum_generator(best_params)
+        test_w, test_f, p, t, mfs, contribution = spectrum_generator(best_params, quench_co2_off_co=True, debug_abund=True, return_extras=True)
         plt.figure()
         s_test_f = spectres(sw, test_w[0], test_f[0])
         plt.errorbar(sw, sf, yerr=sfe, label='sphere', marker='.', color='k', ls='none')
@@ -668,3 +670,43 @@ if __name__ == '__main__':
         plt.errorbar(test_w[2], test_f[2], marker='s', color='red')
         plt.legend()
         plt.savefig(output_dir+f'best_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
+
+        # plot p-T profile
+        plt.figure()
+        plt.plot(t, p, color='k')
+        plt.yscale('log')
+        plt.ylim(1e3, 1e-6)
+        plt.savefig(output_dir+f'pt_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
+        
+        # plot contribution function
+        
+        # Normalization
+        index = (contribution < 1e-16) & np.isnan(contribution)
+        contribution[index] = 1e-16
+
+        pressure_weights = np.diff(np.log10(p))
+        weights = np.ones_like(p)
+        weights[:-1] = pressure_weights
+        weights[-1] = weights[-2]
+        weights = weights / np.sum(weights)
+        weights = weights.reshape(len(weights), 1)
+
+        x, y = np.meshgrid(allw, p)
+
+        fig, ax = plt.subplots()
+        
+        plot_cont = contribution / weights
+        label = "Weighted Flux"
+
+        im = ax.contourf(x,
+                            y,
+                            plot_cont,
+                            30, # n contour levels
+                            cmap='magma')
+        ax.set_xlabel("Wavelength [$\mu$m]")
+        ax.set_ylabel("Pressure [bar]")
+        ax.set_yscale("log")
+        ax.set_ylim(p[-1] * 1.03, p[0] / 1.03)
+        plt.colorbar(im, ax=ax, label=label)
+        plt.savefig(output_dir+f'contribution_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
+
