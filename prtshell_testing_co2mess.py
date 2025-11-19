@@ -130,7 +130,7 @@ if __name__ == '__main__':
         'dPT_1':0.20,
 
         'C/O':0.55,
-        'Fe/H':0.75,
+        'Fe/H':0.0,
         'log_Kzz_chem':15,
         # 'C_iso':100,
         'fsed':4,
@@ -240,7 +240,7 @@ if __name__ == '__main__':
     chem.load()
     # Load scattering version of pRT
 
-    rtpressures = np.logspace(-6, 3, 1000) # set pressure range
+    rtpressures = np.logspace(-6, 3, 100) # set pressure range
     line_species = [
         'H2O',
         'CO-NatAbund',
@@ -264,7 +264,7 @@ if __name__ == '__main__':
     cloud_species = ['MgSiO3(s)_crystalline__DHS',
                     'Fe(s)_crystalline__DHS'] # these will be important for clouds
 
-    smresl = '1000' # sphere model resolution, R=160 c-k
+    smresl = '160' # sphere model resolution, R=160 c-k
     atmosphere_sphere = Radtrans(
         pressures = rtpressures,
         line_species = [i+f'.R{smresl}' for i in line_species],
@@ -287,7 +287,7 @@ if __name__ == '__main__':
     )
 
     atmosphere_photometrys = []
-    ptmresl = '1000' # photometry model resolution, R=40 c-k
+    ptmresl = '40' # photometry model resolution, R=40 c-k
     for i,filt in enumerate(pnames):
         atmosphere_phot_i = Radtrans(
             pressures = rtpressures,
@@ -449,20 +449,24 @@ if __name__ == '__main__':
             if p_quench is not None:
                 p_quench_co2 = kzz_to_co2_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_Kzz_chem, log10_metallicities)
                 # in between p_quench_co and p_quench_co2, use Keq, then past p_quench_co2, fix co2
-                quenchish_idx = np.logical_and(pressures <= p_quench, pressures <= p_quench_co2)
+                if p_quench_co2 is not None:
+                    quenchish_idx = np.logical_and(pressures <= p_quench, pressures <= p_quench_co2)
+                else:
+                    quenchish_idx = pressures <= p_quench
                 mf_h2 = mass_fractions['H2'][quenchish_idx]
                 mf_co = mass_fractions['CO'][quenchish_idx]
                 mf_h2o = mass_fractions['H2O'][quenchish_idx]
                 Keq = 18.3*np.exp((-2376/temperature[quenchish_idx]) - ((932/temperature[quenchish_idx])**2))
                 mass_fractions['CO2'][quenchish_idx] = (mf_co * mf_h2o)/(mf_h2 * Keq)
-                quench_idx = np.min(
-                    (
-                        np.searchsorted(pressures, p_quench_co2),
-                        pressures.size - 1
+                if p_quench_co2 is not None:
+                    quench_idx = np.min(
+                        (
+                            np.searchsorted(pressures, p_quench_co2),
+                            pressures.size - 1
+                        )
                     )
-                )
-                mass_fractions['CO2'][pressures < p_quench_co2] = \
-                    mass_fractions['CO2'][quench_idx]
+                    mass_fractions['CO2'][pressures < p_quench_co2] = \
+                        mass_fractions['CO2'][quench_idx]
 
 
 
@@ -610,6 +614,10 @@ if __name__ == '__main__':
         t_end = time.time()
         print('First spectrum Generation time: {:.1f}s'.format(t_end - t_start))
         t_start = time.time()
+        test_w, test_f = spectrum_generator(default_params)
+        t_end = time.time()
+        print('Second spectrum Generation time: {:.1f}s'.format(t_end - t_start))
+        t_start = time.time()
         ln = likelihood(default_params)
         t_end = time.time()
         print('Likelihood time: {:.1f}s'.format(t_end - t_start))
@@ -686,7 +694,7 @@ if __name__ == '__main__':
     # prior.add_parameter('rv', dist=(-1000, 1000))
 
 
-    n_live = 480
+    n_live = 960
 
     # run the sampler!
     # print(f'starting pool with {os.cpu_count()} cores')

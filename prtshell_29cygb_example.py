@@ -54,7 +54,7 @@ plot = True
 # sampling parameters
 discard_exploration = False
 f_live = 0.01
-resume = False
+resume = True
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
