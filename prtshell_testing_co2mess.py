@@ -131,7 +131,7 @@ if __name__ == '__main__':
 
         'C/O':0.55,
         'Fe/H':0.75,
-        'log_Kzz_chem':10,
+        'log_Kzz_chem':15,
         # 'C_iso':100,
         'fsed':4,
         'sigma_lnorm':1.5,
@@ -264,7 +264,7 @@ if __name__ == '__main__':
     cloud_species = ['MgSiO3(s)_crystalline__DHS',
                     'Fe(s)_crystalline__DHS'] # these will be important for clouds
 
-    smresl = '160' # sphere model resolution, R=160 c-k
+    smresl = '1000' # sphere model resolution, R=160 c-k
     atmosphere_sphere = Radtrans(
         pressures = rtpressures,
         line_species = [i+f'.R{smresl}' for i in line_species],
@@ -287,7 +287,7 @@ if __name__ == '__main__':
     )
 
     atmosphere_photometrys = []
-    ptmresl = '40' # photometry model resolution, R=40 c-k
+    ptmresl = '1000' # photometry model resolution, R=40 c-k
     for i,filt in enumerate(pnames):
         atmosphere_phot_i = Radtrans(
             pressures = rtpressures,
@@ -300,6 +300,89 @@ if __name__ == '__main__':
         )
         atmosphere_photometrys.append(atmosphere_phot_i)
 
+
+    def kzz_to_co_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_Kzz_chem, log10_metallicities):
+        # Pressure scale height (m)
+        h_scale = cst.kB * temperature / (mean_molar_masses * cst.amu * reference_gravity)
+
+        # Diffusion coefficient (m2 s-1)
+        chem_kzz = 10.0**log_Kzz_chem
+
+        # Mixing timescale (s)
+        t_mix = h_scale**2 / chem_kzz
+
+        # chemical timescales eq. 12-14 from Zahnle & Marley 2014
+        metal = 10.0**log10_metallicities
+        # t_chem_co = 1.5e-6 * pressures**-1.0 * metal**-0.7 * np.exp(42000.0 / temperature)
+        t_chem_1 = 1.5e-6 * pressures**-1.0 * metal**-0.7 * np.exp(42000.0 / temperature)
+        t_chem_2 = 40 * pressures**-2.0 * np.exp(25000.0 / temperature)
+
+        t_chem_co = ((1/t_chem_1)+(1/t_chem_2))**-1.0
+
+        # Determine pressure at which t_mix = t_chem
+
+        t_diff = t_mix - t_chem_co
+        diff_product = t_diff[1:] * t_diff[:-1]
+
+        # If t_mix and t_chem intersect then there
+        # is 1 negative value in diff_product
+        indices = diff_product < 0.0
+
+        if np.sum(indices) == 1:
+            p_quench = (pressures[1:] + pressures[:-1])[indices] / 2.0
+            p_quench = p_quench[0]
+
+        elif np.sum(indices) == 0:
+            p_quench = None
+        
+        else:
+            # print('found multiple p_quench intersections')
+            # print(dict(zip(pressures, indices)))
+            crossing = np.where(indices)[0]
+            # print(crossing)
+            p_quench = (pressures[1:] + pressures[:-1])[crossing] / 2.0
+            # print(p_quench)
+            p_quench = np.max(p_quench)
+            # print(p_quench)
+            # crash
+        return p_quench
+    
+    def kzz_to_co2_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_Kzz_chem, log10_metallicities):
+        # Pressure scale height (m)
+        h_scale = cst.kB * temperature / (mean_molar_masses * cst.amu * reference_gravity)
+
+        # Diffusion coefficient (m2 s-1)
+        chem_kzz = 10.0**log_Kzz_chem
+
+        # Mixing timescale (s)
+        t_mix = h_scale**2 / chem_kzz
+
+        # chemical timescales eq. 12-14 from Zahnle & Marley 2014
+        metal = 10.0**log10_metallicities
+        t_chem_co2 = 1e-10 * pressures**-0.5 * np.exp(38000.0 / temperature)
+
+        # Determine pressure at which t_mix = t_chem
+
+        t_diff = t_mix - t_chem_co2
+        diff_product = t_diff[1:] * t_diff[:-1]
+
+        # If t_mix and t_chem intersect then there
+        # is 1 negative value in diff_product
+        indices = diff_product < 0.0
+
+        if np.sum(indices) == 1:
+            p_quench = (pressures[1:] + pressures[:-1])[indices] / 2.0
+            p_quench = p_quench[0]
+
+        elif np.sum(indices) == 0:
+            p_quench = None
+        
+        else:
+            crossing = np.where(indices)[0]
+            p_quench = (pressures[1:] + pressures[:-1])[crossing] / 2.0
+            p_quench = np.max(p_quench)
+
+        return p_quench
 
     def spectrum_generator(params, quench_co2_off_co=True, debug_abund=False, return_extras=False):
         planet_radius = params['R_pl']* cst.r_jup_mean
@@ -340,52 +423,13 @@ if __name__ == '__main__':
             log10_metallicities=log10_metallicities,
             temperatures=temperature,
             pressures=pressures,
-            # carbon_pressure_quench=10**log_pquench,
             full=True
         )
 
         if debug_abund:
             mf_eqchem = copy.deepcopy(mass_fractions)
 
-        # Pressure scale height (m)
-        h_scale = cst.kB * temperature / (mean_molar_masses * cst.amu * reference_gravity)
-
-        # Diffusion coefficient (m2 s-1)
-        chem_kzz = 10.0**log_Kzz_chem
-
-        # Mixing timescale (s)
-        t_mix = h_scale**2 / chem_kzz
-
-        # Chemical timescale (see Eq. 12 from Zahnle & Marley 2014)
-        metal = 10.0**log10_metallicities
-        t_chem_co = 1.5e-6 * pressures**-1.0 * metal**-0.7 * np.exp(42000.0 / temperature)
-
-        # Determine pressure at which t_mix = t_chem
-
-        t_diff = t_mix - t_chem_co
-        diff_product = t_diff[1:] * t_diff[:-1]
-
-        # If t_mix and t_chem intersect then there
-        # is 1 negative value in diff_product
-        indices = diff_product < 0.0
-
-        if np.sum(indices) == 1:
-            p_quench = (pressures[1:] + pressures[:-1])[indices] / 2.0
-            p_quench = p_quench[0]
-
-        elif np.sum(indices) == 0:
-            p_quench = None
-        
-        else:
-            # print('found multiple p_quench intersections')
-            # print(dict(zip(pressures, indices)))
-            crossing = np.where(indices)[0]
-            # print(crossing)
-            p_quench = (pressures[1:] + pressures[:-1])[crossing] / 2.0
-            # print(p_quench)
-            p_quench = np.max(p_quench)
-            # print(p_quench)
-            # crash
+        p_quench = kzz_to_co_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_Kzz_chem, log10_metallicities)
 
         if p_quench is not None:
 
@@ -403,12 +447,24 @@ if __name__ == '__main__':
 
         if quench_co2_off_co:
             if p_quench is not None:
-                quench_idx = pressures <= p_quench
-                mf_h2 = mass_fractions['H2'][quench_idx]
-                mf_co = mass_fractions['CO'][quench_idx]
-                mf_h2o = mass_fractions['H2O'][quench_idx]
-                Keq = 18.3*np.exp((-2376/temperature[quench_idx]) - ((932/temperature[quench_idx])**2))
-                mass_fractions['CO2'][quench_idx] = (mf_co * mf_h2o)/(mf_h2 * Keq)
+                p_quench_co2 = kzz_to_co2_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_Kzz_chem, log10_metallicities)
+                # in between p_quench_co and p_quench_co2, use Keq, then past p_quench_co2, fix co2
+                quenchish_idx = np.logical_and(pressures <= p_quench, pressures <= p_quench_co2)
+                mf_h2 = mass_fractions['H2'][quenchish_idx]
+                mf_co = mass_fractions['CO'][quenchish_idx]
+                mf_h2o = mass_fractions['H2O'][quenchish_idx]
+                Keq = 18.3*np.exp((-2376/temperature[quenchish_idx]) - ((932/temperature[quenchish_idx])**2))
+                mass_fractions['CO2'][quenchish_idx] = (mf_co * mf_h2o)/(mf_h2 * Keq)
+                quench_idx = np.min(
+                    (
+                        np.searchsorted(pressures, p_quench_co2),
+                        pressures.size - 1
+                    )
+                )
+                mass_fractions['CO2'][pressures < p_quench_co2] = \
+                    mass_fractions['CO2'][quench_idx]
+
+
 
         if debug_abund:
             mf_list = ['H2', 'H2O', 'CO', 'CH4', 'CO2']
@@ -421,15 +477,19 @@ if __name__ == '__main__':
                         ax.plot(mass_fractions[key], pressures, label=key, color='k', ls='--')
                         ax.plot(mf_orig[key], pressures, color='k')
                         ax.plot(mf_eqchem[key], pressures, color='k', alpha=0.5)
-                        
+                        if quench_co2_off_co:
+                            if p_quench is not None:
+                                ax.hlines(p_quench_co2, 1e-8, 9e-1, ls='--', color='tomato', label='P quench CO2')
                     else:
                         i += 1
                         ax.plot(mass_fractions[key], pressures, label=key, ls='--', color=mf_colors[i])
                         ax.plot(mf_orig[key], pressures, color=mf_colors[i])
                         ax.plot(mf_eqchem[key], pressures, color=mf_colors[i], alpha=0.5)
+            if p_quench is not None:
+                ax.hlines(p_quench, 1e-8, 9e-1, ls='-', color='tomato', label='P quench CO-CH4-H2O')
             ax.legend()
             ax.set_xlim(1e-8, 9e-1)
-            ax.set_ylim(1e1, 1e-1)
+            ax.set_ylim(1e3, 1e-6)
             ax.set_xscale('log')
             ax.set_yscale('log')
             plt.savefig(output_dir+'debug_abund_two.png')
@@ -566,10 +626,17 @@ if __name__ == '__main__':
 
         test_w, test_f_noqco2 = spectrum_generator(default_params, quench_co2_off_co=False, debug_abund=True)
         test_w, test_f_qco2 = spectrum_generator(default_params, quench_co2_off_co=True, debug_abund=True)
+        eq_params = copy.deepcopy(default_params)
+        eq_params['log_Kzz_chem'] = 0.0
+        test_w, test_f_alleq = spectrum_generator(eq_params, quench_co2_off_co=False, debug_abund=False)
         plt.figure()
-        plt.plot(test_w[2], test_f_noqco2[2])
-        plt.plot(test_w[2], test_f_qco2[2])
+        plt.plot(test_w[2], test_f_noqco2[2], label='quench co2 off quenched co')
+        plt.plot(test_w[2], test_f_qco2[2], label='co2 follows chem eq, co quenched (original retrieval)')
+        plt.plot(test_w[2], test_f_alleq[2], label='all mol in chem eq')
         plt.xlim(3.5, 5.5)
+        plt.ylim(2e-16, 6e-16)
+        plt.yscale('log')
+        plt.legend()
         plt.savefig(output_dir+'test_co2_quench.png')
 
     prior = Prior()
@@ -601,7 +668,7 @@ if __name__ == '__main__':
     
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
-    prior.add_parameter('log_kzz_chem', dist=(4, 14))
+    prior.add_parameter('log_kzz_chem', dist=(4, 20))
 
     # prior.add_parameter('fsed', dist=(0.01, 10))
     prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
