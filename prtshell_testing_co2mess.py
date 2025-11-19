@@ -240,7 +240,7 @@ if __name__ == '__main__':
     chem.load()
     # Load scattering version of pRT
 
-    rtpressures = np.logspace(-6, 3, 100) # set pressure range
+    rtpressures = np.logspace(-6, 3, 1000) # set pressure range
     line_species = [
         'H2O',
         'CO-NatAbund',
@@ -375,6 +375,17 @@ if __name__ == '__main__':
 
         elif np.sum(indices) == 0:
             p_quench = None
+        
+        else:
+            # print('found multiple p_quench intersections')
+            # print(dict(zip(pressures, indices)))
+            crossing = np.where(indices)[0]
+            # print(crossing)
+            p_quench = (pressures[1:] + pressures[:-1])[crossing] / 2.0
+            # print(p_quench)
+            p_quench = np.max(p_quench)
+            # print(p_quench)
+            # crash
 
         if p_quench is not None:
 
@@ -392,42 +403,36 @@ if __name__ == '__main__':
 
         if quench_co2_off_co:
             if p_quench is not None:
-                # vmrs = mf2vmr(mass_fractions, mean_molar_masses)
                 quench_idx = pressures <= p_quench
-                # vmr_h2 = vmrs['H2'][quench_idx]
-                # vmr_co = vmrs['CO'][quench_idx]
-                # vmr_h2o = vmrs['H2O'][quench_idx]
                 mf_h2 = mass_fractions['H2'][quench_idx]
                 mf_co = mass_fractions['CO'][quench_idx]
                 mf_h2o = mass_fractions['H2O'][quench_idx]
                 Keq = 18.3*np.exp((-2376/temperature[quench_idx]) - ((932/temperature[quench_idx])**2))
-                # vmrs['CO2'][quench_idx] = Keq * (vmr_co * vmr_h2o)/(vmr_h2)
-                # mass_fractions = mf2vmr(vmrs, mean_molar_masses)
                 mass_fractions['CO2'][quench_idx] = (mf_co * mf_h2o)/(mf_h2 * Keq)
 
         if debug_abund:
             mf_list = ['H2', 'H2O', 'CO', 'CH4', 'CO2']
             mf_colors = ['blue', 'red', 'green', 'orange', 'purple']
-            plt.figure()
+            fig, ax = plt.subplots()
             i = 0
             for key in list(mass_fractions.keys()):
                 if key in mf_list:
                     if key == 'CO2':
-                        plt.plot(mass_fractions[key], pressures, label=key, color='k', ls='--')
-                        plt.plot(mf_orig[key], pressures, color='k')
-                        plt.plot(mf_eqchem[key], pressures, color='k', alpha=0.5)
+                        ax.plot(mass_fractions[key], pressures, label=key, color='k', ls='--')
+                        ax.plot(mf_orig[key], pressures, color='k')
+                        ax.plot(mf_eqchem[key], pressures, color='k', alpha=0.5)
                         
                     else:
                         i += 1
-                        plt.plot(mass_fractions[key], pressures, label=key, ls='--', color=mf_colors[i])
-                        plt.plot(mf_orig[key], pressures, color=mf_colors[i])
-                        plt.plot(mf_eqchem[key], pressures, color=mf_colors[i], alpha=0.5)
-            plt.legend()
-            plt.xscale('log')
-            plt.yscale('log')
-            plt.xlim(1e-8, 5e-1)
-            plt.ylim(1e3, 1e-6)
-            plt.savefig(output_dir+'debug_abund.png')
+                        ax.plot(mass_fractions[key], pressures, label=key, ls='--', color=mf_colors[i])
+                        ax.plot(mf_orig[key], pressures, color=mf_colors[i])
+                        ax.plot(mf_eqchem[key], pressures, color=mf_colors[i], alpha=0.5)
+            ax.legend()
+            ax.set_xlim(1e-8, 9e-1)
+            ax.set_ylim(1e1, 1e-1)
+            ax.set_xscale('log')
+            ax.set_yscale('log')
+            plt.savefig(output_dir+'debug_abund_two.png')
 
         if '13CO' in atmosphere_sphere.line_species:
             c_iso_ratio = params['C_iso']
