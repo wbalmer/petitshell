@@ -59,7 +59,7 @@ networks = 4
 
 resume = False
 
-dyn = False
+dyn = True
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -335,20 +335,20 @@ if __name__ == '__main__':
         # plt.legend()
         # plt.savefig(output_dir+'test_fakedata_generation.png')
 
-
-        # ndim = prior.dimensionality()
-        # test_cube = np.ones(ndim) / 2
-        # print(test_cube)
-        # test_cube = prior_dyn(test_cube)
-        # print(test_cube)
-        # ln_test = likelihood_dyn(test_cube)
-        # print(ln_test)
-
     # run the sampler!
 
     if dyn:
 
         import dynesty
+
+        ndim = prior.dimensionality()
+        test_cube = np.ones(ndim) / 2
+        print(test_cube)
+        test_cube = prior_dyn(test_cube)
+        print(test_cube)
+        ln_test = likelihood_dyn(test_cube)
+        print(ln_test)
+
         print(f'starting pool with {os.cpu_count()} cores')
         with mp.Pool(os.cpu_count()) as pool:
         # print(f'starting pool with {size} processes')
@@ -369,7 +369,8 @@ if __name__ == '__main__':
                                                        prior_dyn,
                                                        ndim,
                                                        sample='unif',
-                                                       pool=pool)
+                                                       pool=pool, 
+                                                       queue_size=os.cpu_count())
             t_start = time.time()
             sampler.run_nested(
                                n_effective=10000,
