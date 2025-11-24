@@ -56,7 +56,7 @@ checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 discard_exploration = False
 f_live = 0.01
 resume = True
-plot = False
+plot = True
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -138,11 +138,11 @@ if __name__ == '__main__':
 
         'C/O':0.55,
         'Fe/H':0.0,
-        'log_Kzz_chem':10,
+        'log_kzz_chem':10,
         # 'C_iso':100,
         'fsed':4,
         'sigma_lnorm':1.5,
-        'log_Kzz_cloud':10,
+        'log_kzz_cloud':10,
         # 'mmw':2.33,
         'corr_len_sphere':-1, # log10 [-3, 0] 
         'corr_amp_sphere':0.5 # [0, 1]
@@ -436,7 +436,7 @@ if __name__ == '__main__':
 
         co_ratio = params['C/O']
         feh = params['Fe/H']
-        log_Kzz_chem = params['log_Kzz_chem']
+        log_kzz_chem = params['log_kzz_chem']
 
         co_ratios = co_ratio * np.ones_like(pressures)
         log10_metallicities = feh * np.ones_like(pressures)
@@ -452,7 +452,7 @@ if __name__ == '__main__':
         if debug_abund:
             mf_eqchem = copy.deepcopy(mass_fractions)
 
-        p_quench = kzz_to_co_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_Kzz_chem, log10_metallicities)
+        p_quench = kzz_to_co_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_kzz_chem, log10_metallicities)
 
         if p_quench is not None:
 
@@ -470,7 +470,7 @@ if __name__ == '__main__':
 
         if quench_co2_off_co:
             if p_quench is not None:
-                p_quench_co2 = kzz_to_co2_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_Kzz_chem, log10_metallicities)
+                p_quench_co2 = kzz_to_co2_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_kzz_chem, log10_metallicities)
                 # in between p_quench_co and p_quench_co2, use Keq, then past p_quench_co2, fix co2
                 if p_quench_co2 is not None:
                     quenchish_idx = np.logical_and(pressures <= p_quench, pressures <= p_quench_co2)
@@ -527,7 +527,7 @@ if __name__ == '__main__':
             mass_fractions['12CO'] = mass_fractions['CO']-mass_fractions['13CO']
 
         sigma_lnorm = params['sigma_lnorm']
-        log_kzz_cloud = params['log_Kzz_cloud']
+        log_kzz_cloud = params['log_kzz_cloud']
 
         # mmw = params['mmw'] # we get mean_molar_masses from chem.interpolate instead of setting it ourselves
         # mean_molar_masses = mmw * np.ones_like(temperature)
@@ -671,7 +671,7 @@ if __name__ == '__main__':
         test_w, test_f_noqco2 = spectrum_generator(default_params, quench_co2_off_co=False, debug_abund=True)
         test_w, test_f_qco2 = spectrum_generator(default_params, quench_co2_off_co=True, debug_abund=True)
         eq_params = copy.deepcopy(default_params)
-        eq_params['log_Kzz_chem'] = 0.0
+        eq_params['log_kzz_chem'] = 0.0
         test_w, test_f_alleq = spectrum_generator(eq_params, quench_co2_off_co=False, debug_abund=False)
         plt.figure()
         plt.plot(test_w[2], test_f_noqco2[2], label='quench co2 off quenched co')
@@ -727,9 +727,9 @@ if __name__ == '__main__':
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
     prior.add_parameter('log_kzz_chem', dist=(1, 15))
 
-    # prior.add_parameter('fsed', dist=(0.01, 10))
-    prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
-    prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-4, 10))
+    prior.add_parameter('fsed', dist=(0.01, 10))
+    # prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
+    # prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-4, 10))
     
     # prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-10, 1))
     # prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
