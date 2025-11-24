@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=ntls-29cygb  # Job name
-#SBATCH --output=29cygb_shell_testbasic_outputs/output.txt          # Standard output file
-#SBATCH --error=29cygb_shell_testbasic_outputs/error.txt            # Standard error file
+#SBATCH --output=29Cygb_shell_kzzchem_outputs/output.txt          # Standard output file
+#SBATCH --error=29Cygb_shell_kzzchem_outputs/error.txt            # Standard error file
 #SBATCH --partition=parallel	      # Partition or queue name
 #SBATCH --nodes=4                     # Number of nodes
 #SBATCH --ntasks-per-node=48          # Number of tasks per node
@@ -18,7 +18,8 @@ conda activate prt3
 
 # Run your Python script
 
-mpiexec -n 192 python prtshell_29cygb_example.py
+mpiexec -n 192 python prtshell_co2quench_29cygb.py
+# mpiexec -n 192 python prtshell_29cygb_example.py
 # mpiexec -n 44 python prtshell_29cygb_example.py
 
 
