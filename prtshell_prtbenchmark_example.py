@@ -55,11 +55,11 @@ checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 n_live = 1000
 discard_exploration = False
 f_live = 0.01
-networks = 4
+networks = 64
 
 resume = False
 
-dyn = True
+dyn = False
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
