@@ -47,7 +47,7 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 
 
 # general setup
-retrieval_name = 'BENCH_DYNESTY_LARGEPARAM'
+retrieval_name = 'BENCH_DYNESTY_FIXLARGEPARAM'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 
@@ -349,9 +349,11 @@ if __name__ == '__main__':
     if dyn:
 
         import dynesty
-        print(f'starting pool with {size} processes')
-        comm.Barrier()
-        with MPIPool() as pool:
+        print(f'starting pool with {os.cpu_count()} cores')
+        with mp.Pool(os.cpu_count()) as pool:
+        # print(f'starting pool with {size} processes')
+        # comm.Barrier()
+        # with MPIPool() as pool:
 
             # if not pool.is_master():
             #     pool.wait()

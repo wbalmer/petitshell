@@ -32,9 +32,10 @@ from mpi4py.futures import MPIPoolExecutor
 from schwimmbad import MPIPool
 from mpi4py import MPI
 
-comm = MPI.COMM_WORLD
-size = comm.Get_size()
-rank = comm.Get_rank()
+# comm = MPI.COMM_WORLD
+# size = comm.Get_size()
+# rank = comm.Get_rank()
+rank = 0
 
 # prt specific imports
 from petitRADTRANS import physical_constants as cst
@@ -46,14 +47,14 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 
 
 # general setup
-retrieval_name = '2M0624_TEST'
+retrieval_name = '2M0624_RUN'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 
 # sampling parameters
 discard_exploration = False
 f_live = 0.01
-resume = True
+resume = False
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -94,9 +95,15 @@ if __name__ == '__main__':
         'C/O':0.55,
         'Fe/H':0.0,
         'log_pquench':0.0,
-        'fsed':4,
+        # 'fsed':4,
         'sigma_lnorm':1.5,
         'logKzz':10,
+
+        'fsed_MgSiO3(s)_crystalline__DHS':2,
+        'fsed_Fe(s)_crystalline__DHS':2,
+    
+        'eq_scaling_MgSiO3(s)_crystalline__DHS':0,
+        'eq_scaling_Fe(s)_crystalline__DHS':0
     }
 
     def likelihood(param_dict, debug=False):
@@ -115,7 +122,7 @@ if __name__ == '__main__':
         
         if debug:
             plt.figure()
-            plt.plot(w, rb_f_i)
+            plt.plot(w, rb_f_i, color='k')
 
         if 'corr_len' in param_dict.keys():
             # from Wang et al. 2020, species.fit.fit_model
@@ -153,9 +160,10 @@ if __name__ == '__main__':
             ln += -chi2/2 - np.nansum(np.log(2*np.pi*fe**2)/2)
             
         if debug:
-            plt.errorbar(w_i[2], f_i[2], marker='s', color='red')
-            plt.savefig('temp_spec.png')
-            print(ln)
+            # plt.errorbar(w_i[0], f_i[0], marker='', color='red')
+            plt.yscale('log')
+            plt.savefig(output_dir+'temp_spec.png')
+            # print(ln)
 
         return ln
 
@@ -254,17 +262,15 @@ if __name__ == '__main__':
         mmw = np.mean(mean_molar_masses)
 
         eddy_diffusion_coefficients = np.ones_like(temperature)*1e1**logkzz
-        if 'fsed' not in params.keys():
-            cloud_f_sed = {}
-            for specie in atmosphere.cloud_species:
-                cloud_f_sed[specie] = params[f'fsed_{specie}']
-        else:
-            fsed = params['fsed'] # global fsed for now
-            cloud_f_sed = {specie:fsed for specie in atmosphere.cloud_species}
         cloud_particle_radius_distribution_std = sigma_lnorm
 
         cbases = {}
+        cloud_f_sed = {}
         for specie in atmosphere.cloud_species:
+            if 'fsed_' + specie in params.keys():
+                cloud_f_sed[specie] = params[f'fsed_{specie}']
+            else:
+                cloud_f_sed[specie] = params['fsed']
             easy_chem_name = specie.split('_')[0].split('-')[0].split(".")[0]
             cmf = return_cloud_mass_fraction(specie, feh, co_ratio)
             cbase = simple_cdf(specie, pressures, temperature, feh, co_ratio, mmw=mmw)
@@ -334,6 +340,7 @@ if __name__ == '__main__':
         plt.errorbar(w, f, yerr=fe, label='jwst', marker='.', color='k', ls='none')
         plt.plot(w, s_test_f, label=ln, color='red')
         plt.legend()
+        plt.yscale('log')
         plt.savefig(output_dir+'test_alldata_generation.png')
 
     prior = Prior()
@@ -377,11 +384,11 @@ if __name__ == '__main__':
     # prior.add_parameter('C_iso', dist=(10, 200))
 
     # prior.add_parameter('fsed', dist=(0.01, 10))
-    prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
-    prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-4, 10))
+    prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-2, 10))
+    prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-2, 10))
     
-    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-10, 1))
-    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
+    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-4, 2))
+    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-4, 2))
     
     prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
     prior.add_parameter('logKzz', dist=(4, 14))
@@ -392,14 +399,14 @@ if __name__ == '__main__':
     # prior.add_parameter('rv', dist=(-1000, 1000))
 
 
-    n_live = 480
+    n_live = 640
 
     # run the sampler!
-    # print(f'starting pool with {os.cpu_count()} cores')
-    # with mp.Pool(os.cpu_count()) as pool:
-    print(f'starting pool with {size} processes')
-    comm.Barrier()
-    with MPIPool() as pool:
+    print(f'starting pool with {os.cpu_count()} cores')
+    with mp.Pool(os.cpu_count()) as pool:
+    # print(f'starting pool with {size} processes')
+    # comm.Barrier()
+    # with MPIPool() as pool:
         sampler = Sampler(prior, likelihood,
                           n_live=n_live,
                           filepath=checkpoint_file,
@@ -445,5 +452,6 @@ if __name__ == '__main__':
         s_test_f = spectres(w, test_w[0], test_f[0])
         plt.errorbar(w, f, yerr=fe, label='jwst', marker='.', color='k', ls='none')
         plt.plot(w, s_test_f, label=ln, color='red')
+        plt.yscale('log')
         plt.legend()
         plt.savefig(output_dir+f'best_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
