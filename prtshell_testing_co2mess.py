@@ -320,12 +320,12 @@ if __name__ == '__main__':
         )
 
 
-    def kzz_to_co_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_Kzz_chem, log10_metallicities):
+    def kzz_to_co_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_kzz_chem, log10_metallicities):
         # Pressure scale height (m)
         h_scale = cst.kB * temperature / (mean_molar_masses * cst.amu * reference_gravity)
 
         # Diffusion coefficient (m2 s-1)
-        chem_kzz = 10.0**log_Kzz_chem
+        chem_kzz = 10.0**log_kzz_chem
 
         # Mixing timescale (s)
         t_mix = h_scale**2 / chem_kzz
@@ -366,12 +366,12 @@ if __name__ == '__main__':
             # crash
         return p_quench
     
-    def kzz_to_co2_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_Kzz_chem, log10_metallicities):
+    def kzz_to_co2_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_kzz_chem, log10_metallicities):
         # Pressure scale height (m)
         h_scale = cst.kB * temperature / (mean_molar_masses * cst.amu * reference_gravity)
 
         # Diffusion coefficient (m2 s-1)
-        chem_kzz = 10.0**log_Kzz_chem
+        chem_kzz = 10.0**log_kzz_chem
 
         # Mixing timescale (s)
         t_mix = h_scale**2 / chem_kzz
@@ -534,17 +534,15 @@ if __name__ == '__main__':
         mmw = np.mean(mean_molar_masses)
 
         eddy_diffusion_coefficients = np.ones_like(temperature)*1e1**log_kzz_cloud
-        if 'fsed' not in params.keys():
-            cloud_f_sed = {}
-            for specie in atmosphere_sphere.cloud_species:
-                cloud_f_sed[specie] = params[f'fsed_{specie}']
-        else:
-            fsed = params['fsed'] # global fsed for now
-            cloud_f_sed = {specie:fsed for specie in atmosphere_sphere.cloud_species}
         cloud_particle_radius_distribution_std = sigma_lnorm
 
         cbases = {}
+        cloud_f_sed = {}
         for specie in atmosphere_sphere.cloud_species:
+            if 'fsed_' + specie in params.keys():
+                cloud_f_sed[specie] = params[f'fsed_{specie}']
+            else:
+                cloud_f_sed[specie] = params['fsed']
             easy_chem_name = specie.split('_')[0].split('-')[0].split(".")[0]
             cmf = return_cloud_mass_fraction(specie, feh, co_ratio)
             cbase = simple_cdf(specie, pressures, temperature, feh, co_ratio, mmw=mmw)

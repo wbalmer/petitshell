@@ -401,25 +401,22 @@ if __name__ == '__main__':
         # mean_molar_masses = mmw * np.ones_like(temperature)
         mmw = np.mean(mean_molar_masses)
 
-        eddy_diffusion_coefficients = np.ones_like(temperature)*1e1**logkzz
-        if 'fsed' not in params.keys():
-            cloud_f_sed = {}
-            for specie in atmosphere_sphere.cloud_species:
-                cloud_f_sed[specie] = params[f'fsed_{specie}']
-        else:
-            fsed = params['fsed'] # global fsed for now
-            cloud_f_sed = {specie:fsed for specie in atmosphere_sphere.cloud_species}
+        eddy_diffusion_coefficients = np.ones_like(temperature)*1e1**log_kzz_cloud
         cloud_particle_radius_distribution_std = sigma_lnorm
 
         cbases = {}
+        cloud_f_sed = {}
         for specie in atmosphere_sphere.cloud_species:
+            if 'fsed_' + specie in params.keys():
+                cloud_f_sed[specie] = params[f'fsed_{specie}']
+            else:
+                cloud_f_sed[specie] = params['fsed']
             easy_chem_name = specie.split('_')[0].split('-')[0].split(".")[0]
             cmf = return_cloud_mass_fraction(specie, feh, co_ratio)
             cbase = simple_cdf(specie, pressures, temperature, feh, co_ratio, mmw=mmw)
             cbases[easy_chem_name] = cbase
             mass_fractions_cloud = np.zeros_like(temperature)
             mass_fractions_cloud[pressures<=cbase] = cmf * (pressures[pressures<=cbase] / cbase) ** cloud_f_sed[specie]
-
             
             if "eq_scaling_" + specie in params.keys():
                 mass_fractions_cloud *= (10 ** params['eq_scaling_' + specie]) # Scaled by a constant factor
