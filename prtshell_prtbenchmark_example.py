@@ -5,7 +5,7 @@
 import os
 import sys
 os.environ["OMP_NUM_THREADS"] = "1" # stop e.g. numpy from doing own parallel with mpi
-os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE" # keep hdf5 file locking up across processes 
+os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE" # keep hdf5 file locking up across processes
 sys.setdlopenflags(os.RTLD_NOW | os.RTLD_GLOBAL) # for rockfish dlopen error
 
 # basic imports
@@ -23,7 +23,7 @@ from spectres import spectres
 from species import SpeciesInit
 from species.phot.syn_phot import SyntheticPhotometry
 
-# sampler imports 
+# sampler imports
 from nautilus import Prior
 from nautilus import Sampler
 
@@ -32,10 +32,10 @@ from mpi4py.futures import MPIPoolExecutor
 from schwimmbad import MPIPool
 from mpi4py import MPI
 
-comm = MPI.COMM_WORLD
-size = comm.Get_size()
-rank = comm.Get_rank()
-# rank = 0
+# comm = MPI.COMM_WORLD
+# size = comm.Get_size()
+# rank = comm.Get_rank()
+rank = 0
 
 # prt specific imports
 from petitRADTRANS import physical_constants as cst
@@ -54,12 +54,12 @@ checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 # sampling parameters
 n_live = 1000
 discard_exploration = False
-f_live = 0.05
+f_live = 0.01
 networks = 4
 
 resume = False
 
-dyn = True
+dyn = False
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -73,7 +73,7 @@ if __name__ == '__main__':
     data_path = './example_data/'
     # data = np.loadtxt(data_path+'fake_data.txt')
     data = np.loadtxt(data_path+'fake_data_1-3mu.txt')
-    
+
     w = data[:,0]
     f = data[:,1]
     fe = data[:,2]
@@ -108,23 +108,23 @@ if __name__ == '__main__':
         chi2 = np.nansum(((f - rb_f_i)/fe)**2)
         ln = -chi2/2 - np.nansum(np.log(2*np.pi*fe**2)/2) # normalize chi2 to ln
         return ln
-    
+
     prior = Prior()
-    
+
     mu_radius = 1.0
     sigma_radius = 0.1
     a_radius, b_radius = (0.75 - mu_radius) / sigma_radius, (2.0 - mu_radius) / sigma_radius
     prior.add_parameter('R_pl', dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius))
     prior.add_parameter('logg', dist=(3.0, 5.5))
     prior.add_parameter('plx', dist=norm(loc=10.0, scale=0.5))
-    
-    prior.add_parameter('T3', dist=(0, 500))
-    prior.add_parameter('T2', dist=(100, 600))
-    prior.add_parameter('T1', dist=(200, 700))
-    prior.add_parameter('T_int', dist=(500, 1500))
+
+    prior.add_parameter('T3', dist=(0, 1))
+    prior.add_parameter('T2', dist=(0, 1))
+    prior.add_parameter('T1', dist=(0, 1))
+    prior.add_parameter('T_int', dist=(200, 2000))
     prior.add_parameter('log_delta', dist=(0, 1))
     prior.add_parameter('alpha', dist=(1, 2))
-    
+
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
     prior.add_parameter('log_pquench', dist=(-3,3))
@@ -140,7 +140,7 @@ if __name__ == '__main__':
         chi2 = np.nansum(((f - rb_f_i)/fe)**2)
         ln = -chi2/2 - np.nansum(np.log(2*np.pi*fe**2)/2) # normalize chi2 to ln
         return ln
-    
+
     def prior_dyn(cube):
         cube = prior.unit_to_physical(cube)
         return cube
@@ -188,14 +188,14 @@ if __name__ == '__main__':
             planet_radius = params['R_pl']* cst.r_jup_mean
             reference_gravity = 1e1**params['logg']
             parallax = params['plx']
-            
+
             t3 = params['T3']
             t2 = params['T2']
             t1 = params['T1']
             intrinsic_temperature = params['T_int']
             log_delta = params['log_delta']
             alpha = params['alpha']
-            
+
             co_ratio = params['C/O']
             feh = params['Fe/H']
             log_pquench = params['log_pquench']
@@ -206,21 +206,21 @@ if __name__ == '__main__':
             planet_radius = params[0]* cst.r_jup_mean
             reference_gravity = 1e1**params[1]
             parallax = params[2]
-            
+
             t3 = params[3]
             t2 = params[4]
             t1 = params[5]
             intrinsic_temperature = params[6]
             log_delta = params[7]
             alpha = params[8]
-            
+
             co_ratio = params[9]
             feh = params[10]
             log_pquench = params[11]
             fsed = params[12] # global fsed for now
             sigma_lnorm = params[13]
             logkzz = params[14]
-        
+
         pressures = atmosphere.pressures * 1e-6 # cgs to bar
         r2d2 = (planet_radius/(cst.pc/(parallax/1000)))**2
 
@@ -245,7 +245,7 @@ if __name__ == '__main__':
 
         co_ratios = co_ratio * np.ones_like(pressures)
         log10_metallicities = feh * np.ones_like(pressures)
-        
+
         mass_fractions, mean_molar_masses, nabla_ad = chem.interpolate_mass_fractions(
             co_ratios=co_ratios,
             log10_metallicities=log10_metallicities,
@@ -260,7 +260,7 @@ if __name__ == '__main__':
         mmw = np.mean(mean_molar_masses)
 
         eddy_diffusion_coefficients = np.ones_like(temperature)*1e1**logkzz
-        
+
         cloud_f_sed = {specie:fsed for specie in atmosphere.cloud_species}
         cloud_particle_radius_distribution_std = sigma_lnorm
 
@@ -273,7 +273,7 @@ if __name__ == '__main__':
             mass_fractions_cloud = np.zeros_like(temperature)
             mass_fractions_cloud[pressures<=cbase] = cmf * (pressures[pressures<=cbase] / cbase) ** cloud_f_sed[specie]
             mass_fractions[specie] = mass_fractions_cloud
-            
+
         for species in line_species:
             easy_chem_name = species.split('_')[0].split('-')[0].split(".")[0]
             if 'FeH' in species:
@@ -283,8 +283,8 @@ if __name__ == '__main__':
                     index_ro = pressures < cbases['Fe(s)']  # Must have iron cloud
                     abunds_change_rainout[index_ro] = 0.
                 mass_fractions[species] = abunds_change_rainout
-                
-        
+
+
         # set up resolution specific mass fraction dictionaries
         mfs = copy.copy(mass_fractions)
         for key in line_species:
@@ -322,19 +322,19 @@ if __name__ == '__main__':
         plt.plot(w, s_test_f, label=ln, color='red')
         plt.legend()
         plt.savefig(output_dir+'test_alldata_generation.png')
-        
+
         # generate fake spectra
         # snr = 10
         # noise_sim = np.abs(s_test_f/snr)
-        
+
         # benchmark_model_spectrum = np.array([w,s_test_f,noise_sim]).T
         # np.savetxt('./example_data/fake_data_1-3mu.txt', benchmark_model_spectrum)
-        
+
         # plt.figure()
         # plt.errorbar(benchmark_model_spectrum[:,0], benchmark_model_spectrum[:,1], yerr=benchmark_model_spectrum[:,2], label=f'fake data snr={snr}', marker='.', color='k', ls='none')
         # plt.legend()
         # plt.savefig(output_dir+'test_fakedata_generation.png')
-        
+
 
         # ndim = prior.dimensionality()
         # test_cube = np.ones(ndim) / 2
@@ -363,7 +363,7 @@ if __name__ == '__main__':
                     pool=pool,
                 )
             else:
-                sampler = dynesty.DynamicNestedSampler(likelihood_dyn, 
+                sampler = dynesty.DynamicNestedSampler(likelihood_dyn,
                                                        prior_dyn,
                                                        ndim,
                                                        sample='unif',
@@ -372,11 +372,11 @@ if __name__ == '__main__':
             sampler.run_nested(
                                n_effective=10000,
                                nlive_init=n_live,
-                               dlogz_init=f_live, 
+                               dlogz_init=f_live,
                                checkpoint_file=checkpoint_file.replace('.hdf5','.save'),
                                resume=resume)
             t_end = time.time()
-            sresults = sampler.results    
+            sresults = sampler.results
 
         if rank == 0:
             print('Sampling took: {:.1f}s'.format(t_end - t_start))
@@ -402,10 +402,10 @@ if __name__ == '__main__':
             quant = np.quantile(samples, [0.1587, 0.8413], axis=0)
 
             sresults.summary()
-        
+
             best_params = median
             print(best_params)
-        
+
             test_w, test_f = spectrum_generator(best_params)
             print('test w is', test_w)
             print('test f is', test_f)
@@ -422,11 +422,11 @@ if __name__ == '__main__':
 
 
     else:
-        # print(f'starting pool with {os.cpu_count()} cores')
-        # with mp.Pool(os.cpu_count()) as pool:
-        print(f'starting pool with {size} processes')
-        comm.Barrier()
-        with MPIPool() as pool:
+        print(f'starting pool with {os.cpu_count()} cores')
+        with mp.Pool(os.cpu_count()) as pool:
+        # print(f'starting pool with {size} processes')
+        # comm.Barrier()
+        # with MPIPool() as pool:
             sampler = Sampler(prior, likelihood_nautilus,
                             n_live=n_live,
                             filepath=checkpoint_file,
@@ -435,35 +435,35 @@ if __name__ == '__main__':
                             resume=resume
                             )
             t_start = time.time()
-            sampler.run(f_live=f_live, # default is 0.01, fract of evidence in live set before termination 
+            sampler.run(f_live=f_live, # default is 0.01, fract of evidence in live set before termination
                         discard_exploration=discard_exploration, # true for publication ready? fully unbiased
                         verbose=True)
             t_end = time.time()
-            
+
         if rank==0:
             print('Sampling took: {:.1f}s'.format(t_end - t_start))
-        
-        
+
+
             points, log_w, log_l = sampler.posterior()
             # log_l = log_l[~np.isnan(points)]
             # log_w = log_w[~np.isnan(points)]
             points[np.isnan(points)] = 0.0
             # print(points)
             corndog = corner.corner(
-                points, weights=np.exp(log_w), 
+                points, weights=np.exp(log_w),
                 bins=20, labels=prior.keys, color='dodgerblue',
                 plot_datapoints=False,
                 range=np.repeat(0.999, len(prior.keys))
             )
             plt.savefig(output_dir+f'nautlius_cornerplot_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
             print('log Z: {:.2f}'.format(sampler.log_z))
-        
+
             best = points[np.where(log_l==np.nanmax(log_l))][0]
-        
+
             best_params = default_params
             for i,param in enumerate(prior.keys):
                 best_params[param] = best[i]
-        
+
             test_w, test_f = spectrum_generator(best_params)
             plt.figure()
             s_test_f = spectres(w, test_w, test_f)
@@ -474,4 +474,3 @@ if __name__ == '__main__':
 
             print('found best fit parameters:')
             print(dict(zip(default_params.keys(), best)))
-
