@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=ntls-co2kzz  # Job name
-#SBATCH --output=29cygb_shell_testkzzco2_outputs/output.txt          # Standard output file
-#SBATCH --error=29cygb_shell_testkzzco2_outputs/error.txt            # Standard error file
+#SBATCH --output=AFLepb_shell_testkzzco2_outputs/output.txt          # Standard output file
+#SBATCH --error=AFLepb_shell_testkzzco2_outputs/error.txt            # Standard error file
 #SBATCH --partition=parallel	      # Partition or queue name
 #SBATCH --nodes=3                     # Number of nodes
 #SBATCH --ntasks-per-node=48          # Number of tasks per node

@@ -1,0 +1,6 @@
+# aflepb photometry 
+# name, w_low, w_high, flux, error
+Keck/NIRC2.Lp, 3.33, 4.22, 6.08e-17, 7.86e-18
+JWST/NIRCam2025.F410M, 3.72, 4.47, 3.85e-17, 3.03e-18
+JWST/NIRCam2025.F430M, 4.09, 4.48, 1.43e-17, 1.34e-18
+JWST/NIRCam2025.F460M, 4.42, 4.86, 1.13e-17, 1.53e-18

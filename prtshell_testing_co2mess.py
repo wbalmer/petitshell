@@ -48,7 +48,7 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 
 
 # general setup
-retrieval_name = '29cygb_shell_testkzzco2'
+retrieval_name = 'AFLepb_shell_testkzzco2'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 
@@ -56,6 +56,7 @@ checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 discard_exploration = False
 f_live = 0.01
 resume = True
+plot = False
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -67,13 +68,19 @@ if __name__ == '__main__':
     SpeciesInit()
 
     data_path = './example_data/'
-    sdata = np.loadtxt(data_path+'29cygb_charis_wm2um.dat', delimiter=',')
-    gdata = fits.getdata(data_path+'29cygb_gravity.fits')
-    pdata = data_path+'29cygb_photometry.dat'
+    # for 29 Cyg
+    # sdata = np.loadtxt(data_path+'29cygb_charis_wm2um.dat', delimiter=',')
+    # gdata = fits.getdata(data_path+'29cygb_gravity.fits')
+    # pdata = data_path+'29cygb_photometry.dat'
     
-    sw = sdata[:,0]
-    sf = sdata[:,1]
-    sfe = sdata[:,2]
+    # for AF Lep
+    gdata = fits.getdata(data_path+'dbf_aflepb_gravity_kband.fits')
+    sdata = fits.getdata(data_path+'dbf_aflepb_sphere_yjh1_paco.fits')
+    pdata = data_path+'aflepb_photometry.txt'
+    
+    sw = sdata['WAVELENGTH'] # sdata[:,0]
+    sf = sdata['FLUX'] # sdata[:,1]
+    sfe = np.sqrt(np.diag(sdata['COVARIANCE'])) # sdata[:,2]
 
     gw = gdata['WAVELENGTH']
     gf = gdata['FLUX']
@@ -116,22 +123,22 @@ if __name__ == '__main__':
         # 'T_int':850,
         # 'T_eq':0.0,
 
-        'T_bottom':6000.,
-        'N_layers':10,
-        'dPT_10':0.05,
-        'dPT_9':0.05,
-        'dPT_8':0.05,
-        'dPT_7':0.06,
+        'T_bottom':5000.,
+        'N_layers':6,
+        # 'dPT_10':0.05,
+        # 'dPT_9':0.05,
+        # 'dPT_8':0.05,
+        # 'dPT_7':0.06,
         'dPT_6':0.08,
         'dPT_5':0.16,
         'dPT_4':0.21,
         'dPT_3':0.18,
         'dPT_2':0.15,
-        'dPT_1':0.20,
+        'dPT_1':0.25,
 
         'C/O':0.55,
         'Fe/H':0.0,
-        'log_Kzz_chem':15,
+        'log_Kzz_chem':10,
         # 'C_iso':100,
         'fsed':4,
         'sigma_lnorm':1.5,
@@ -299,6 +306,18 @@ if __name__ == '__main__':
             line_opacity_mode='c-k' # lbl or c-k
         )
         atmosphere_photometrys.append(atmosphere_phot_i)
+    
+    if plot:
+        plotresl = '1000' # gravity model resolution, standard R=1000 c-k
+        atmosphere_plot = Radtrans(
+            pressures = rtpressures,
+            line_species = [i+f'.R{plotresl}' for i in line_species],
+            rayleigh_species = rayleigh_species, # why is the sky blue?
+            gas_continuum_contributors = gas_continuum_contributors, # these are important sources of opacity
+            cloud_species = cloud_species, # these will be important for clouds
+            wavelength_boundaries = [0.95, 5.5],
+            line_opacity_mode='c-k' # lbl or c-k
+        )
 
 
     def kzz_to_co_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_Kzz_chem, log10_metallicities):
@@ -402,12 +421,16 @@ if __name__ == '__main__':
         layer_pt_slopes = np.ones(num_layer) * np.nan
         for index in range(num_layer):
             layer_pt_slopes[index] = params[f'dPT_{num_layer - index}']
+        if num_layer > 6:
+            top_press = -6
+        else:
+            top_press = -3
         temperature = dtdp_temperature_profile(
             pressures,
             num_layer,
             layer_pt_slopes,
             t_bottom,
-            top_of_atmosphere_pressure=-3,
+            top_of_atmosphere_pressure=top_press,
             bottom_of_atmosphere_pressure=3
         )
 
@@ -604,7 +627,20 @@ if __name__ == '__main__':
         flux = [flux_sphere * r2d2 * unit_conv, flux_gravity * r2d2 * unit_conv, phot_fluxes]
 
         if return_extras:
-            return wavelengths, flux, pressures, temperature, mass_fractions, additional_returned_quantities['emission_contribution']
+            if plot:
+                wavelengths_plot, flux_plot, additional_returned_quantities = atmosphere_plot.calculate_flux(
+                    temperatures=temperature,
+                    mass_fractions=gmfs,
+                    mean_molar_masses=mean_molar_masses,
+                    reference_gravity=reference_gravity,
+                    eddy_diffusion_coefficients=eddy_diffusion_coefficients,
+                    cloud_f_sed=cloud_f_sed,
+                    cloud_particle_radius_distribution_std = cloud_particle_radius_distribution_std,
+                    return_contribution=True
+                )
+                return wavelengths, flux, wavelengths_plot*1e4, flux_plot* r2d2 * unit_conv, pressures, temperature, mass_fractions, additional_returned_quantities['emission_contribution']
+            else:
+                raise ValueError("Can't return extras if plot is not true")
         else:
             return wavelengths, flux
 
@@ -650,40 +686,53 @@ if __name__ == '__main__':
     prior = Prior()
     
     mu_radius = 1.3
-    sigma_radius = 0.1
+    sigma_radius = 0.03
     a_radius, b_radius = (0.75 - mu_radius) / sigma_radius, (2.0 - mu_radius) / sigma_radius
     prior.add_parameter('R_pl', dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius))
     
-    mu_mass = 15
-    sigma_mass = 5
+    # mu_mass = 15
+    # sigma_mass = 5
+    mu_mass = 3.75
+    sigma_mass = 0.5
     a_mass, b_mass = (0.1 - mu_mass) / sigma_mass, (50.0 - mu_mass) / sigma_mass
     prior.add_parameter('mass', dist=truncnorm(a_mass, b_mass, mu_mass, scale=sigma_mass))
     
     # prior.add_parameter('logg', dist=norm(loc=3.7, scale=0.1))
     
-    prior.add_parameter('plx', dist=norm(loc=24.5456, scale=0.0911))
+    # prior.add_parameter('plx', dist=norm(loc=24.5456, scale=0.0911)) # 29 cyg gaia
+    prior.add_parameter('plx', dist=norm(loc=37.2539, scale=0.0195)) # af lep gaia
 
-    prior.add_parameter('T_bottom', dist=(2500, 25000))
+    prior.add_parameter('T_bottom', dist=(2000, 20000))
+    # z23, combo of diff. grids from 10^-3 to 10^3
     prior.add_parameter('dPT_1', dist=norm(loc=0.25, scale=0.025))
     prior.add_parameter('dPT_2', dist=norm(loc=0.25, scale=0.045))
     prior.add_parameter('dPT_3', dist=norm(loc=0.26, scale=0.05))
     prior.add_parameter('dPT_4', dist=norm(loc=0.2, scale=0.05))
     prior.add_parameter('dPT_5', dist=norm(loc=0.12, scale=0.045))
     prior.add_parameter('dPT_6', dist=norm(loc=0.07, scale=0.07))
-    prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
-    prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
-    prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
+
+    # z25, sonora diamondback for 2m1207b
+    # prior.add_parameter('dPT_1', dist=(0.05, 0.25)) # diamondback doesn't give P-T below 10^2 so ZJ adopted a uniform prior...
+    # prior.add_parameter('dPT_2', dist=norm(loc=0.15, scale=0.01))
+    # prior.add_parameter('dPT_3', dist=norm(loc=0.18, scale=0.04))
+    # prior.add_parameter('dPT_4', dist=norm(loc=0.21, scale=0.05))
+    # prior.add_parameter('dPT_5', dist=norm(loc=0.16, scale=0.06))
+    # prior.add_parameter('dPT_6', dist=norm(loc=0.08, scale=0.025))
+    # prior.add_parameter('dPT_7', dist=norm(loc=0.06, scale=0.02))
+    # prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
+    # prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
+    # prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
     
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
-    prior.add_parameter('log_kzz_chem', dist=(4, 20))
+    prior.add_parameter('log_kzz_chem', dist=(1, 15))
 
     # prior.add_parameter('fsed', dist=(0.01, 10))
     prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
     prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-4, 10))
     
-    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-10, 1))
-    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
+    # prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-10, 1))
+    # prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
     
     prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
     prior.add_parameter('log_kzz_cloud', dist=(4, 14))
@@ -742,55 +791,57 @@ if __name__ == '__main__':
         for i,param in enumerate(prior.keys):
             best_params[param] = best[i]
     
-        test_w, test_f, p, t, mfs, contribution = spectrum_generator(best_params, quench_co2_off_co=True, debug_abund=True, return_extras=True)
-        plt.figure()
-        s_test_f = spectres(sw, test_w[0], test_f[0])
-        plt.errorbar(sw, sf, yerr=sfe, label='sphere', marker='.', color='k', ls='none')
-        g_test_f = spectres(gw, test_w[1], test_f[1])
-        plt.errorbar(gw, gf, yerr=gfe, label='gravity', color='k', ls='none')
-        plt.plot(sw, s_test_f, label=ln, color='red')
-        plt.plot(gw, g_test_f, color='red')
-        plt.errorbar(test_w[2], pfs, yerr=pfes, marker='o', color='k', label='photometry')
-        plt.errorbar(test_w[2], test_f[2], marker='s', color='red')
-        plt.legend()
-        plt.savefig(output_dir+f'best_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
-
-        # plot p-T profile
-        plt.figure()
-        plt.plot(t, p, color='k')
-        plt.yscale('log')
-        plt.ylim(1e3, 1e-6)
-        plt.savefig(output_dir+f'pt_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
-        
-        # plot contribution function
-        
-        # Normalization
-        index = (contribution < 1e-16) & np.isnan(contribution)
-        contribution[index] = 1e-16
-
-        pressure_weights = np.diff(np.log10(p))
-        weights = np.ones_like(p)
-        weights[:-1] = pressure_weights
-        weights[-1] = weights[-2]
-        weights = weights / np.sum(weights)
-        weights = weights.reshape(len(weights), 1)
-
-        x, y = np.meshgrid(allw, p)
-
-        fig, ax = plt.subplots()
-        
-        plot_cont = contribution / weights
-        label = "Weighted Flux"
-
-        im = ax.contourf(x,
-                            y,
-                            plot_cont,
-                            30, # n contour levels
-                            cmap='magma')
-        ax.set_xlabel("Wavelength [$\mu$m]")
-        ax.set_ylabel("Pressure [bar]")
-        ax.set_yscale("log")
-        ax.set_ylim(p[-1] * 1.03, p[0] / 1.03)
-        plt.colorbar(im, ax=ax, label=label)
-        plt.savefig(output_dir+f'contribution_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
+        if plot:
+            test_w, test_f, allw, allf, p, t, mfs, contribution = spectrum_generator(best_params, quench_co2_off_co=True, debug_abund=True, return_extras=True)
+            plt.figure()
+            s_test_f = spectres(sw, test_w[0], test_f[0])
+            plt.errorbar(sw, sf, yerr=sfe, label='charis low', marker='.', color='k', ls='none')
+            plt.errorbar(gw, gf, yerr=gfe, label='gravity', color='k', ls='none')
+            plt.errorbar(test_w[2], test_f[2], marker='s', color='red')
+            
+            plt.plot(allw, allf, label=ln, color='red')
+            plt.errorbar(test_w[2], pfs, yerr=pfes, marker='o', color='k', label='photometry')
+            
+            plt.legend()
+            plt.savefig(output_dir+f'best_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
+            
+            # plot p-T profile
+            plt.figure()
+            plt.plot(t, p, color='k')
+            plt.yscale('log')
+            plt.ylim(1e3, 1e-6)
+            plt.savefig(output_dir+f'pt_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
+            
+            
+            # plot contribution function
+            
+            # Normalization
+            index = (contribution < 1e-16) & np.isnan(contribution)
+            contribution[index] = 1e-16
+    
+            pressure_weights = np.diff(np.log10(p))
+            weights = np.ones_like(p)
+            weights[:-1] = pressure_weights
+            weights[-1] = weights[-2]
+            weights = weights / np.sum(weights)
+            weights = weights.reshape(len(weights), 1)
+    
+            x, y = np.meshgrid(allw, p)
+    
+            fig, ax = plt.subplots()
+            
+            plot_cont = contribution / weights
+            label = "Weighted Flux"
+    
+            im = ax.contourf(x,
+                             y,
+                             plot_cont,
+                             30, # n contour levels
+                             cmap='magma')
+            ax.set_xlabel("Wavelength [$\mu$m]")
+            ax.set_ylabel("Pressure [bar]")
+            ax.set_yscale("log")
+            ax.set_ylim(p[-1] * 1.03, p[0] / 1.03)
+            plt.colorbar(im, ax=ax, label=label)
+            plt.savefig(output_dir+f'contribution_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
 

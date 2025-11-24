@@ -49,12 +49,12 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 retrieval_name = '29cygb_shell_testeqchem'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
-plot = True
+plot = False
 
 # sampling parameters
 discard_exploration = False
 f_live = 0.01
-resume = True
+resume = False
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -130,11 +130,11 @@ if __name__ == '__main__':
         # 'dPT_1':0.25,
         
         'T_bottom':7000.,
-        'N_layers':10,
-        'dPT_10':0.05,
-        'dPT_9':0.05,
-        'dPT_8':0.05,
-        'dPT_7':0.06,
+        'N_layers':6, # or 10
+        # 'dPT_10':0.05,
+        # 'dPT_9':0.05,
+        # 'dPT_8':0.05,
+        # 'dPT_7':0.06,
         'dPT_6':0.08,
         'dPT_5':0.16,
         'dPT_4':0.21,
@@ -357,12 +357,16 @@ if __name__ == '__main__':
         layer_pt_slopes = np.ones(num_layer) * np.nan
         for index in range(num_layer):
             layer_pt_slopes[index] = params[f'dPT_{num_layer - index}']
+        if num_layer > 6:
+            top_press = -6
+        else:
+            top_press = -3
         temperature = dtdp_temperature_profile(
             pressures,
             num_layer,
             layer_pt_slopes,
             t_bottom,
-            top_of_atmosphere_pressure=-6,
+            top_of_atmosphere_pressure=top_press,
             bottom_of_atmosphere_pressure=3
         )
 
@@ -595,17 +599,17 @@ if __name__ == '__main__':
     # prior.add_parameter('dPT_5', dist=norm(loc=0.16, scale=0.06))
     # prior.add_parameter('dPT_6', dist=norm(loc=0.08, scale=0.025))
     # prior.add_parameter('dPT_7', dist=norm(loc=0.06, scale=0.02))
-    prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
-    prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
-    prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
+    # prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
+    # prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
+    # prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
     
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
     prior.add_parameter('log_pquench', dist=(-3, 3))
 
     # prior.add_parameter('fsed', dist=(0.01, 10))
-    prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-3, 10))
-    prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-3, 10))
+    prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(0.01, 10))
+    prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(0.01, 10))
     
     prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-3.5, 1))
     prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-3.5, 1))
