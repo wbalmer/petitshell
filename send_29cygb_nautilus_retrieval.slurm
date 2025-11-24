@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=ntls-29cygb  # Job name
-#SBATCH --output=29cygb_shell_testeqchem_outputs/output.txt          # Standard output file
-#SBATCH --error=29cygb_shell_testeqchem_outputs/error.txt            # Standard error file
+#SBATCH --output=29cygb_shell_testbasic_outputs/output.txt          # Standard output file
+#SBATCH --error=29cygb_shell_testbasic_outputs/error.txt            # Standard error file
 #SBATCH --partition=parallel	      # Partition or queue name
-#SBATCH --nodes=3                     # Number of nodes
+#SBATCH --nodes=4                     # Number of nodes
 #SBATCH --ntasks-per-node=48          # Number of tasks per node
 #SBATCH --cpus-per-task=1             # Number of CPU cores per task
-#SBATCH --time=6:00:00             # Maximum runtime (D-HH:MM:SS)
+#SBATCH --time=12:00:00             # Maximum runtime (D-HH:MM:SS)
 #SBATCH --mail-type=ALL               # Send email at job completion
 #SBATCH --mail-user=wbalmer1@jhu.edu  # Email address for notifications
 
@@ -18,7 +18,7 @@ conda activate prt3
 
 # Run your Python script
 
-mpiexec -n 144 python prtshell_29cygb_example.py
+mpiexec -n 192 python prtshell_29cygb_example.py
 # mpiexec -n 44 python prtshell_29cygb_example.py
 
 

@@ -46,7 +46,7 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 
 
 # general setup
-retrieval_name = '29cygb_shell_testeqchem'
+retrieval_name = '29cygb_shell_testbasic'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 plot = False
@@ -144,7 +144,7 @@ if __name__ == '__main__':
 
         'C/O':0.55,
         'Fe/H':0.5,
-        # 'log_pquench':2.5,
+        'log_pquench':0.0,
         # 'C_iso':100,
         # 'fsed':4,
         'fsed_MgSiO3(s)_crystalline__DHS':1,
@@ -401,7 +401,7 @@ if __name__ == '__main__':
         # mean_molar_masses = mmw * np.ones_like(temperature)
         mmw = np.mean(mean_molar_masses)
 
-        eddy_diffusion_coefficients = np.ones_like(temperature)*1e1**log_kzz_cloud
+        eddy_diffusion_coefficients = np.ones_like(temperature)*1e1**logkzz
         cloud_particle_radius_distribution_std = sigma_lnorm
 
         cbases = {}

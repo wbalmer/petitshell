@@ -55,8 +55,8 @@ checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 # sampling parameters
 discard_exploration = False
 f_live = 0.01
-resume = True
-plot = True
+resume = False
+plot = False
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -725,12 +725,12 @@ if __name__ == '__main__':
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
     prior.add_parameter('log_kzz_chem', dist=(1, 15))
 
-    prior.add_parameter('fsed', dist=(0.01, 10))
-    # prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
-    # prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-4, 10))
+    # prior.add_parameter('fsed', dist=(0.01, 10))
+    prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
+    prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-4, 10))
     
-    # prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-10, 1))
-    # prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
+    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-10, 1))
+    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
     
     prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
     prior.add_parameter('log_kzz_cloud', dist=(4, 14))
