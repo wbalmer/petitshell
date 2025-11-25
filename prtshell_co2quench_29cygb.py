@@ -56,8 +56,8 @@ checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 discard_exploration = False
 f_live = 0.01
 n_live = 1000
-resume = False
-plot = False
+resume = True
+plot = True
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -116,11 +116,11 @@ if __name__ == '__main__':
         'logg':3.7,
 
         'T_bottom':7000.,
-        'N_layers':10,
-        'dPT_10':0.02,
-        'dPT_9':0.02,
-        'dPT_8':0.02,
-        'dPT_7':0.06,
+        'N_layers':6,
+        # 'dPT_10':0.02,
+        # 'dPT_9':0.02,
+        # 'dPT_8':0.02,
+        # 'dPT_7':0.06,
         'dPT_6':0.10,
         'dPT_5':0.12,
         'dPT_4':0.15,
@@ -271,7 +271,8 @@ if __name__ == '__main__':
     rayleigh_species = ['H2', 'He'] # why is the sky blue?
     gas_continuum_contributors = ['H2--H2', 'H2--He'] # these are important sources of opacity
     cloud_species = ['MgSiO3(s)_crystalline__DHS',
-                    'Fe(s)_crystalline__DHS'] # these will be important for clouds
+                     # 'Fe(s)_crystalline__DHS'
+                    ] # these will be important for clouds
 
     smresl = '160' # sphere model resolution, R=160 c-k
     atmosphere_sphere = Radtrans(
@@ -717,21 +718,21 @@ if __name__ == '__main__':
     # prior.add_parameter('dPT_4', dist=norm(loc=0.21, scale=0.05))
     # prior.add_parameter('dPT_5', dist=norm(loc=0.16, scale=0.06))
     # prior.add_parameter('dPT_6', dist=norm(loc=0.08, scale=0.025))
-    prior.add_parameter('dPT_7', dist=norm(loc=0.06, scale=0.04))
-    prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
-    prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
-    prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
+    # prior.add_parameter('dPT_7', dist=norm(loc=0.06, scale=0.04))
+    # prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
+    # prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
+    # prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
     
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
-    prior.add_parameter('log_kzz_chem', dist=(1, 15))
+    prior.add_parameter('log_kzz_chem', dist=(-5, 25))
 
-    # prior.add_parameter('fsed', dist=(0.01, 10))
-    prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
-    prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-4, 10))
+    prior.add_parameter('fsed', dist=(0.01, 10))
+    # prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
+    # prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-4, 10))
     
-    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-10, 1))
-    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
+    # prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-10, 1))
+    # prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
     
     prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
     prior.add_parameter('log_kzz_cloud', dist=(4, 14))
@@ -751,7 +752,7 @@ if __name__ == '__main__':
                           n_live=n_live,
                           filepath=checkpoint_file,
                           pool=pool,
-                          n_networks=4,
+                          n_networks=192,
                           resume=resume
                           )
         t_start = time.time()
@@ -792,6 +793,7 @@ if __name__ == '__main__':
             plt.figure()
             s_test_f = spectres(sw, test_w[0], test_f[0])
             plt.errorbar(sw, sf, yerr=sfe, label='charis low', marker='.', color='k', ls='none')
+            plt.errorbar(hw, hf, yerr=hfe, label='charis h', marker='.', color='k', ls='none')
             plt.errorbar(gw, gf, yerr=gfe, label='gravity', color='k', ls='none')
             plt.errorbar(test_w[2], test_f[2], marker='s', color='red')
             
@@ -807,6 +809,42 @@ if __name__ == '__main__':
             plt.yscale('log')
             plt.ylim(1e3, 1e-6)
             plt.savefig(output_dir+f'pt_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
+            
+            # plot abundances
+            fig, ax = plt.subplots()
+            i = 0
+            for key in list(mfs.keys()):
+                if key in ['H2', 'H2O', 'CO', 'CH4', 'CO2', 'MgSiO3(s)_crystalline__DHS']:
+                    ax.plot(mfs[key], p, label=key)
+            
+            mass_fractions, mean_molar_masses, nabla_ad = chem.interpolate_mass_fractions(
+                co_ratios=best_params['C/O']* np.ones_like(p),
+                log10_metallicities=best_params['Fe/H']* np.ones_like(p),
+                temperatures=t,
+                pressures=p,
+                full=True
+            )  
+            planet_radius = best_params['R_pl']* cst.r_jup_mean
+            reference_gravity = (cst.G*best_params['mass']*cst.m_jup)/(planet_radius**2)
+            co_q = kzz_to_co_pquench(t, p, mean_molar_masses, reference_gravity, best_params['log_kzz_chem'], best_params['Fe/H'])
+            mass_fractions, mean_molar_masses, nabla_ad = chem.interpolate_mass_fractions(
+                co_ratios=best_params['C/O']* np.ones_like(p),
+                log10_metallicities=best_params['Fe/H']* np.ones_like(p),
+                temperatures=t,
+                pressures=p,
+                carbon_pressure_quench=co_q,
+                full=True
+            )
+            co2_q = kzz_to_co2_pquench(t, p, mean_molar_masses, reference_gravity, best_params['log_kzz_chem'], best_params['Fe/H'])
+            ax.hlines(co_q, 1e-8, 9e-1, ls='--', color='black', label='P_q, CO')
+            ax.hlines(co2_q, 1e-8, 9e-1, ls='--', color='gray', label='P_q, CO2')
+            ax.legend(bbox_to_anchor=(1.0, 0.75), ncol=1, fancybox=True, shadow=True)
+            ax.set_xlim(1e-8, 9e-1)
+            ax.set_ylim(1e3, 1e-6)
+            ax.set_xscale('log')
+            ax.set_yscale('log')
+            ax.set_title('kzz='+str(round(best_params['log_kzz_chem'], 2)))
+            plt.savefig(output_dir+f'abundance_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
             
             
             # plot contribution function

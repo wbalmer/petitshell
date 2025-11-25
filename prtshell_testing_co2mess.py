@@ -723,14 +723,14 @@ if __name__ == '__main__':
     
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
-    prior.add_parameter('log_kzz_chem', dist=(1, 15))
+    prior.add_parameter('log_kzz_chem', dist=(-5, 25))
 
     # prior.add_parameter('fsed', dist=(0.01, 10))
-    prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
-    prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-4, 10))
+    prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-2, 10))
+    prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-2, 10))
     
-    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-10, 1))
-    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
+    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-5, 2))
+    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-5, 2))
     
     prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
     prior.add_parameter('log_kzz_cloud', dist=(4, 14))
@@ -741,7 +741,7 @@ if __name__ == '__main__':
     # prior.add_parameter('rv', dist=(-1000, 1000))
 
 
-    n_live = 960
+    n_live = 1000
 
     # run the sampler!
     # print(f'starting pool with {os.cpu_count()} cores')

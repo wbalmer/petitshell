@@ -6,7 +6,7 @@
 #SBATCH --nodes=4                     # Number of nodes
 #SBATCH --ntasks-per-node=48          # Number of tasks per node
 #SBATCH --cpus-per-task=1             # Number of CPU cores per task
-#SBATCH --time=12:00:00             # Maximum runtime (D-HH:MM:SS)
+#SBATCH --time=06:00:00             # Maximum runtime (D-HH:MM:SS)
 #SBATCH --mail-type=ALL               # Send email at job completion
 #SBATCH --mail-user=wbalmer1@jhu.edu  # Email address for notifications
 
