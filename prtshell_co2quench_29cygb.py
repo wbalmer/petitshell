@@ -48,7 +48,7 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 
 
 # general setup
-retrieval_name = '29Cygb_shell_kzzchem'
+retrieval_name = '29Cygb_shell_kzzchem_onecloud'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 
@@ -57,7 +57,7 @@ discard_exploration = False
 f_live = 0.01
 n_live = 1000
 resume = True
-plot = True
+plot = False
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -727,11 +727,11 @@ if __name__ == '__main__':
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
     prior.add_parameter('log_kzz_chem', dist=(-5, 25))
 
-    prior.add_parameter('fsed', dist=(0.01, 10))
-    # prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
+    # prior.add_parameter('fsed', dist=(0.01, 10))
+    prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
     # prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-4, 10))
     
-    # prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-10, 1))
+    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-3.5, 1))
     # prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
     
     prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
@@ -743,11 +743,11 @@ if __name__ == '__main__':
     # prior.add_parameter('rv', dist=(-1000, 1000))
 
     # run the sampler!
-    # print(f'starting pool with {os.cpu_count()} cores')
-    # with mp.Pool(os.cpu_count()) as pool:
-    print(f'starting pool with {size} processes')
-    comm.Barrier()
-    with MPIPool() as pool:
+    print(f'starting pool with {os.cpu_count()} cores')
+    with mp.Pool(os.cpu_count()) as pool:
+    # print(f'starting pool with {size} processes')
+    # comm.Barrier()
+    # with MPIPool() as pool:
         sampler = Sampler(prior, likelihood,
                           n_live=n_live,
                           filepath=checkpoint_file,

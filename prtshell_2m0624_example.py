@@ -54,7 +54,7 @@ checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 # sampling parameters
 discard_exploration = False
 f_live = 0.01
-resume = False
+resume = True
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
