@@ -1,0 +1,3 @@
+# aflepb photometry 
+# name, w_low, w_high, flux, error
+MKO/NSFCam.H, 1.45, 1.81, 5.19e-17, 7.19e-18
