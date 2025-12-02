@@ -38,7 +38,7 @@ rank = comm.Get_rank()
 
 # prt specific imports
 from petitRADTRANS import physical_constants as cst
-from petitRADTRANS.physics import temperature_profile_function_guillot_global, dtdp_temperature_profile
+from petitRADTRANS.physics import temperature_profile_function_guillot_global, dtdp_temperature_profile, frequency2wavelength
 from petitRADTRANS.radtrans import Radtrans # <--- this is our "spectrum generator," e.g. the radiative transfer solver
 from petitRADTRANS.chemistry.pre_calculated_chemistry import PreCalculatedEquilibriumChemistryTable
 from petitRADTRANS.chemistry.utils import mass_fractions2volume_mixing_ratios as mf2vmr
@@ -137,7 +137,7 @@ if __name__ == '__main__':
         # 'corr_amp_ch':0.5 # [0, 1]
     }
 
-    def likelihood(param_dict, debug=False):
+    def likelihood(param_dict, debug=True):
 
         ln = 0
 
@@ -149,18 +149,19 @@ if __name__ == '__main__':
 
         if debug:
             plt.figure()
+            plt.plot(nsw, nsf, color='k')
 
         # compute nirspec likelihood
-
+        nirspec_resolution_array = np.interp(w_i[0], nsw, nirspec_resolution)
         # convolve to resolution
-        cv_f_i = convolve(w_i[0], f_i[0], nirspec_resolution)
-        # resample
-        rb_f_i = spectres(nsw, w_i[0], cv_f_i)
+        cv_f_i = convolve(w_i[0], f_i[0], nirspec_resolution_array)
+        # resample to wl grid
+        rb_f_i = spectres(nsw, w_i[0], cv_f_i) # TODO: use frebin instead of spectres
         # subtract continuum
         frb_f_i = filter_spectrum_with_spline(nsw,rb_f_i,x_nodes=x_nodes)
         
         if debug:
-            plt.plot(nsw, frb_f_i)
+            plt.plot(nsw, frb_f_i, alpha=0.3, ls='--')
 
         ln_ns = (
                 (nsf - frb_f_i)
@@ -196,8 +197,9 @@ if __name__ == '__main__':
             
         if debug:
             plt.errorbar(w_i[1], f_i[1], marker='s', color='red')
+            plt.errorbar(w_i, pfs, yerr=pfes, marker='o', color='k')
             plt.savefig(output_dir+'temp_spec.png')
-            print(ln_g, ln_p)
+            print(ln_ns, ln_p)
 
         return ln
 
@@ -228,7 +230,7 @@ if __name__ == '__main__':
     rayleigh_species = ['H2', 'He'] # why is the sky blue?
     gas_continuum_contributors = ['H2--H2', 'H2--He'] # these are important sources of opacity
     cloud_species = [
-                     'KCl(s)_crystalline__DHS',
+                     'Na2S(s)_crystalline__DHS',
                      'MgSiO3(s)_crystalline__DHS',
                      'Fe(s)_crystalline__DHS'
                     ] # these will be important for clouds
@@ -243,6 +245,9 @@ if __name__ == '__main__':
         wavelength_boundaries = [nsw[0]-0.1, nsw[-1]+0.1],
         line_opacity_mode='lbl' # lbl or c-k
     )
+
+    w_lbl = frequency2wavelength(atmosphere_nirspec._frequencies)*1e4
+    nirspec_resolution_array = np.interp(w_lbl, nsw, nirspec_resolution)
 
     atmosphere_photometrys = []
     ptmresl = '40' # photometry model resolution, R=40 c-k
@@ -441,11 +446,18 @@ if __name__ == '__main__':
                     mass_fractions['CO2'][pressures < p_quench_co2] = \
                         mass_fractions['CO2'][quench_idx]
 
-
+        if '13CO' in line_species:
+            co_total = mass_fractions['CO']
+            c_iso_ratio = params['C_iso']
+            mass_fractions['13CO'] = co_total/c_iso_ratio
+            mass_fractions['12CO'] = co_total-mass_fractions['13CO']
 
         if debug_abund:
-            mf_list = ['H2', 'H2O', 'CO', 'CH4', 'CO2']
-            mf_colors = ['blue', 'red', 'green', 'orange', 'purple']
+            if '13CO' in line_species:
+                mf_list = ['H2', 'H2O', '12CO', '13CO', 'CH4', 'CO2']
+            else:
+                mf_list = ['H2', 'H2O', 'CO', 'CH4', 'CO2']
+            mf_colors = ['blue', 'red', 'green', 'orange', 'purple', 'yellow']
             fig, ax = plt.subplots()
             i = 0
             for key in list(mass_fractions.keys()):
@@ -470,11 +482,6 @@ if __name__ == '__main__':
             ax.set_xscale('log')
             ax.set_yscale('log')
             plt.savefig(output_dir+'debug_abund_two.png')
-
-        if '13CO' in atmosphere_nirspec.line_species:
-            c_iso_ratio = params['C_iso']
-            mass_fractions['13CO'] = mass_fractions['CO']/c_iso_ratio
-            mass_fractions['12CO'] = mass_fractions['CO']-mass_fractions['13CO']
 
         sigma_lnorm = params['sigma_lnorm']
         log_kzz_cloud = params['log_kzz_cloud']
@@ -518,7 +525,7 @@ if __name__ == '__main__':
         
         # set up resolution specific mass fraction dictionaries
         nsmfs = copy.copy(mass_fractions)
-        ptmfs = copy.copy(mass_fractions) 
+        ptmfs = copy.copy(mass_fractions)
         for key in line_species:
             nsmfs[key+f'.R{nsmresl}'] = mass_fractions[key.split('_')[0].split('-')[0].split(".")[0]]
             nsmfs.pop(key.split('_')[0].split('-')[0].split(".")[0], None)
@@ -657,7 +664,7 @@ if __name__ == '__main__':
     # prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
     # prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-4, 10))
     
-    prior.add_parameter('eq_scaling_KCl(s)_crystalline__DHS', dist=(-3.5, 1))
+    prior.add_parameter('eq_scaling_Na2S(s)_crystalline__DHS', dist=(-3.5, 1))
     prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-3.5, 1))
     prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-3.5, 1))
     
