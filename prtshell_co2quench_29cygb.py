@@ -790,6 +790,143 @@ if __name__ == '__main__':
     
         if plot:
             test_w, test_f, allw, allf, p, t, mfs, contribution = spectrum_generator(best_params, quench_co2_off_co=True, debug_abund=True, return_extras=True)
+            
+            axd = plt.figure(layout="constrained", figsize=(8,5)).subplot_mosaic(
+                                """
+                                TTTT
+                                SSSS
+                                SSSS
+                                SSSS
+                                SSSS
+                                EEEE
+                                """
+                            )
+
+            # spec axis, labels
+            axd['S'].set_ylabel('$\lambda F_\lambda$ [$W/m^2/\mu m$]', fontsize=11)
+
+            # sigma axis, labels
+            axd['E'].set_ylim(-4.1, 4.1)
+            axd['T'].set_ylim(0,1)
+            axd['S'].set_ylim(-2e-16,0.8e-15)
+            axd['S'].set_xlim(0.9, 5.2)
+            axd['E'].set_xlim(0.9, 5.2)
+            axd['T'].set_xlim(0.9, 5.2)
+            axd['E'].set_ylabel('$\Delta F_\lambda$ [$\sigma$]', fontsize=11)
+            axd['E'].set_xlabel('Wavelength [$\mu m$]', fontsize=11)
+            axd['T'].set_ylabel('T', fontsize=11)
+
+            axd['S'].tick_params(labelbottom=False)
+            axd['T'].tick_params(labelbottom=False)
+
+            axd['S'].get_yaxis().set_label_coords(-0.065,0.5)
+            axd['E'].get_yaxis().set_label_coords(-0.065,0.5)
+            axd['T'].get_yaxis().set_label_coords(-0.065,0.5)
+
+            wl_m1, fl_m1 = allw, allf
+
+            snora, = axd['S'].plot(wl_m1, fl_m1*wl_m1, ls='-', color='dodgerblue', label=r'petitRADTRANS [M/H]=0.7')
+            axd['E'].plot(wl_m1, fl_m1-fl_m1, ls='-', color='gray')
+
+            chs = np.array([hw, hf, hfe]).T
+
+            char_line = axd['S'].errorbar(chs[:,0], chs[:,1]*chs[:,0], yerr=chs[:,2], 
+                                          marker='none', color='k', ls='none', label='Subaru')
+
+            sonr_char = spectres(chs[:,0], wl_m1, fl_m1)
+
+            char_resid = axd['E'].scatter(chs[:,0], (sonr_char-chs[:,1])/chs[:,2],
+                                          color='dodgerblue', alpha=1, marker="|")
+
+            gv = np.array([gw, gf, gfe]).T
+            grav_line = axd['S'].fill_between(gv[:,0], (gv[:,1]-gv[:,2])*gv[:,0], (gv[:,1]+gv[:,2])*gv[:,0], 
+                                              color='gray', alpha=1, label='VLTI')
+
+            sonr_grv = spectres(gv[:,0], wl_m1, fl_m1)
+
+            grav_resid = axd['E'].plot(gv[:,0], (sonr_grv-gv[:,1])/gv[:,2],
+                                    color='dodgerblue', alpha=1)
+
+            from species.read.read_filter import ReadFilter
+            filter_colors = {'JWST/NIRCAM.F210M': 'rebeccapurple',
+                            'JWST/NIRCAM.F410M': 'dodgerblue',
+                            'JWST/NIRCAM.F430M': 'xkcd:goldenrod',
+                            'JWST/NIRCAM.F460M': 'tomato',
+                            'Keck/NIRC2.Lp': 'xkcd:forest green'}
+
+
+            phot_lines = []
+            nondet_label = "_nolegend_"
+            for i,name in enumerate(pnames):
+                filt = name
+                w, f, fe = pws[i], pfs[i], pfes[i]
+                transmission = ReadFilter(filt)
+                fwhm = transmission.filter_fwhm()
+                synphot = psyns[i]
+                binned_1 = synphot.spectrum_to_flux(wl_m1, fl_m1)[0]
+                if filt in ['JWST/NIRCAM.F210M','JWST/NIRCAM.F410M','JWST/NIRCAM.F430M','JWST/NIRCAM.F460M']:    
+                    marker = 'h'
+                    marker='h' 
+                    color='k'
+                    mfc='white'
+                    mew=2
+                    markersize=8
+                    if filt == 'JWST/NIRCAM.F410M':
+                        label = 'JWST'
+                    else:
+                        label = nondet_label
+                elif filt in ['Keck/NIRC2.Lp']:  
+                    marker='s' 
+                    color='k'
+                    mfc='white'
+                    mew=2
+                    markersize=8
+                    label = 'Keck'
+                    
+                    
+                phot_line = axd['S'].errorbar(w, f*w, #xerr=fwhm/2,
+                                yerr=fe*w,
+                                marker=marker, 
+                                color=color,
+                                mfc=mfc, 
+                                mew=mew,markersize=markersize,
+                                label=label)
+                if filt in ['Keck/NIRC2.Lp', 'JWST/NIRCAM.F410M']:
+                    phot_lines.append(phot_line)
+
+                axd['S'].errorbar(w, binned_1*w,
+                                marker=marker, 
+                                color='dodgerblue',
+                                mfc='xkcd:light blue', 
+                                mew=1,markersize=6,
+                                label=nondet_label)
+
+
+                axd['E'].errorbar(w, (binned_1-f)/fe,
+                                marker=marker, 
+                                color='dodgerblue',
+                                mfc='xkcd:light blue', 
+                                mew=1,markersize=6,
+                                label=nondet_label)
+
+                
+                filter_w = np.linspace(transmission.wavelength_range()[0], transmission.wavelength_range()[1], num=100)
+                filter_interp = transmission.interpolate_filter()
+                axd['T'].plot(filter_w, filter_interp(filter_w), #xerr=fwhm/2,
+                            color=filter_colors[filt])
+
+
+            # Add the first legend
+            first_legend = axd['S'].legend(handles=[char_line, grav_line]+phot_lines, loc='upper right')
+
+            # Add the second legend
+            second_legend = axd['S'].legend(handles=[snora], loc='lower right', ncol=2)
+
+            # Manually add the first legend back to the plot
+            axd['S'].add_artist(first_legend)
+                
+            plt.savefig(output_dir+f'best_{retrieval_name}.pdf', dpi=1000, bbox_inches='tight')
+            
             plt.figure()
             s_test_f = spectres(sw, test_w[0], test_f[0])
             plt.errorbar(sw, sf, yerr=sfe, label='charis low', marker='.', color='k', ls='none')
@@ -801,7 +938,7 @@ if __name__ == '__main__':
             plt.errorbar(test_w[2], pfs, yerr=pfes, marker='o', color='k', label='photometry')
             
             plt.legend()
-            plt.savefig(output_dir+f'best_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
+            plt.savefig(output_dir+f'best_{retrieval_name}_oldplot.pdf', dpi=300, bbox_inches='tight')
             
             # plot p-T profile
             plt.figure()
