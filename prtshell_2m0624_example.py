@@ -99,10 +99,10 @@ if __name__ == '__main__':
         'sigma_lnorm':1.5,
         'logKzz':10,
 
-        'fsed_MgSiO3(s)_crystalline__DHS':2,
+        'fsed_MgSiO3(s)_amorphous__DHS':2,
         'fsed_Fe(s)_crystalline__DHS':2,
     
-        'eq_scaling_MgSiO3(s)_crystalline__DHS':0,
+        'eq_scaling_MgSiO3(s)_amorphous__DHS':0,
         'eq_scaling_Fe(s)_crystalline__DHS':0
     }
 
@@ -119,6 +119,9 @@ if __name__ == '__main__':
         # compute sphere likelihood:
 
         rb_f_i = spectres(w, w_i[0], f_i[0])
+
+        if 'e_hat' in params:
+            fe = fe * params['e_hat']
         
         if debug:
             plt.figure()
@@ -192,8 +195,14 @@ if __name__ == '__main__':
     ]
     rayleigh_species = ['H2', 'He'] # why is the sky blue?
     gas_continuum_contributors = ['H2--H2', 'H2--He'] # these are important sources of opacity
-    cloud_species = ['MgSiO3(s)_crystalline__DHS',
-                    'Fe(s)_crystalline__DHS'] # these will be important for clouds
+    cloud_species = [
+                    'SiO2(s)__DHS',
+                    # 'SiO2(s)_amorphous__Mie',
+                    # 'SiO(s)_amorphous__DHS',
+                    # 'SiO(s)_amorphous__Mie',
+                    'MgSiO3(s)_amorphous__DHS',
+                    'Fe(s)_crystalline__DHS'
+                    ] # clouds
 
     smresl = '1000' # model resolution, R=1000 c-k
     atmosphere = Radtrans(
@@ -206,8 +215,54 @@ if __name__ == '__main__':
         line_opacity_mode='c-k' # lbl or c-k
     )
 
+    def kzz_to_co_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_kzz_chem, log10_metallicities):
+        # Pressure scale height (m)
+        h_scale = cst.kB * temperature / (mean_molar_masses * cst.amu * reference_gravity)
 
-    def spectrum_generator(params):
+        # Diffusion coefficient (m2 s-1)
+        chem_kzz = 10.0**log_kzz_chem
+
+        # Mixing timescale (s)
+        t_mix = h_scale**2 / chem_kzz
+
+        # chemical timescales eq. 12-14 from Zahnle & Marley 2014
+        metal = 10.0**log10_metallicities
+        # t_chem_co = 1.5e-6 * pressures**-1.0 * metal**-0.7 * np.exp(42000.0 / temperature)
+        t_chem_1 = 1.5e-6 * pressures**-1.0 * metal**-0.7 * np.exp(42000.0 / temperature)
+        t_chem_2 = 40 * pressures**-2.0 * np.exp(25000.0 / temperature)
+
+        t_chem_co = ((1/t_chem_1)+(1/t_chem_2))**-1.0
+
+        # Determine pressure at which t_mix = t_chem
+
+        t_diff = t_mix - t_chem_co
+        diff_product = t_diff[1:] * t_diff[:-1]
+
+        # If t_mix and t_chem intersect then there
+        # is 1 negative value in diff_product
+        indices = diff_product < 0.0
+
+        if np.sum(indices) == 1:
+            p_quench = (pressures[1:] + pressures[:-1])[indices] / 2.0
+            p_quench = p_quench[0]
+
+        elif np.sum(indices) == 0:
+            p_quench = None
+        
+        else:
+            # print('found multiple p_quench intersections')
+            # print(dict(zip(pressures, indices)))
+            crossing = np.where(indices)[0]
+            # print(crossing)
+            p_quench = (pressures[1:] + pressures[:-1])[crossing] / 2.0
+            # print(p_quench)
+            p_quench = np.max(p_quench)
+            # print(p_quench)
+            # crash
+        return p_quench
+
+
+    def spectrum_generator(params, return_extras=False):
         planet_radius = params['R_pl']* cst.r_jup_mean
         parallax = params['plx']
         r2d2 = (planet_radius/(cst.pc/(parallax/1000)))**2
@@ -235,7 +290,7 @@ if __name__ == '__main__':
 
         co_ratio = params['C/O']
         feh = params['Fe/H']
-        log_pquench = params['log_pquench']
+        log_kzz_chem = params['log_kzz_chem']
 
         co_ratios = co_ratio * np.ones_like(pressures)
         log10_metallicities = feh * np.ones_like(pressures)
@@ -245,27 +300,42 @@ if __name__ == '__main__':
             log10_metallicities=log10_metallicities,
             temperatures=temperature,
             pressures=pressures,
-            carbon_pressure_quench=10**log_pquench,
             full=True
         )
+
+        p_quench = kzz_to_co_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_kzz_chem, log10_metallicities)
+
+        if p_quench is not None:
+
+            mass_fractions, mean_molar_masses, nabla_ad = chem.interpolate_mass_fractions(
+                co_ratios=co_ratios,
+                log10_metallicities=log10_metallicities,
+                temperatures=temperature,
+                pressures=pressures,
+                carbon_pressure_quench=p_quench,
+                full=True
+            )
 
         if '13CO' in atmosphere.line_species:
             c_iso_ratio = params['C_iso']
             mass_fractions['13CO'] = mass_fractions['CO']/c_iso_ratio
             mass_fractions['12CO'] = mass_fractions['CO']-mass_fractions['13CO']
 
-        sigma_lnorm = params['sigma_lnorm']
-        logkzz = params['logKzz']
+        # cloud_particle_radius_distribution_std = params['sigma_cloud']
+        if 'log_kzz_cloud' in params.keys():
+            log_kzz_cloud = params['log_kzz_cloud']
+        else:
+            log_kzz_cloud = params['log_kzz_chem']
 
         # mmw = params['mmw'] # we get mean_molar_masses from chem.interpolate instead of setting it ourselves
         # mean_molar_masses = mmw * np.ones_like(temperature)
         mmw = np.mean(mean_molar_masses)
 
-        eddy_diffusion_coefficients = np.ones_like(temperature)*1e1**logkzz
-        cloud_particle_radius_distribution_std = sigma_lnorm
+        eddy_diffusion_coefficients = np.ones_like(temperature)*1e1**log_kzz_cloud
 
         cbases = {}
         cloud_f_sed = {}
+        cloud_hansen_bs = {} # 10**params['log_hansen_b']
         for specie in atmosphere.cloud_species:
             if 'fsed_' + specie in params.keys():
                 cloud_f_sed[specie] = params[f'fsed_{specie}']
@@ -273,10 +343,18 @@ if __name__ == '__main__':
                 cloud_f_sed[specie] = params['fsed']
             easy_chem_name = specie.split('_')[0].split('-')[0].split(".")[0]
             cmf = return_cloud_mass_fraction(specie, feh, co_ratio)
-            cbase = simple_cdf(specie, pressures, temperature, feh, co_ratio, mmw=mmw)
-            cbases[easy_chem_name] = cbase
+            if 'P_base_' + specie in params.keys():
+                cbases[easy_chem_name] = params[f'P_base_{specie}']
+            else:
+                cbase = simple_cdf(specie, pressures, temperature, feh, co_ratio, mmw=mmw)
+                cbases[easy_chem_name] = cbase
             mass_fractions_cloud = np.zeros_like(temperature)
             mass_fractions_cloud[pressures<=cbase] = cmf * (pressures[pressures<=cbase] / cbase) ** cloud_f_sed[specie]
+
+            if 'log_hansen_b_' + specie in params.keys():
+                cloud_hansen_bs[specie] = 10**params[f'log_hansen_b_{specie}'] * np.ones_like(pressures)
+            else:
+                cloud_hansen_bs[specie] = 10**params['log_hansen_b'] * np.ones_like(pressures)
             
             if "eq_scaling_" + specie in params.keys():
                 mass_fractions_cloud *= (10 ** params['eq_scaling_' + specie]) # Scaled by a constant factor
@@ -291,8 +369,7 @@ if __name__ == '__main__':
                 if 'Fe(s)' in cbases.keys():
                     index_ro = pressures < cbases['Fe(s)']  # Must have iron cloud
                     abunds_change_rainout[index_ro] = 0.
-                mass_fractions[species] = abunds_change_rainout
-                
+                mass_fractions[species] = abunds_change_rainout                
         
         # set up resolution specific mass fraction dictionaries
         mfs = copy.copy(mass_fractions)
@@ -306,9 +383,13 @@ if __name__ == '__main__':
             mass_fractions=mfs,
             mean_molar_masses=mean_molar_masses,
             reference_gravity=reference_gravity,
+            cloud_particles_radius_distribution="hansen",
             eddy_diffusion_coefficients=eddy_diffusion_coefficients,
             cloud_f_sed=cloud_f_sed,
-            cloud_particle_radius_distribution_std = cloud_particle_radius_distribution_std,
+            # cloud_particle_radius_distribution_std = cloud_particle_radius_distribution_std,
+            cloud_hansen_b=cloud_hansen_bs,
+            # cloud_fraction=1.0,
+            # complete_coverage_clouds=None,
             return_contribution=False
         )
 
@@ -325,7 +406,24 @@ if __name__ == '__main__':
         #     wavelengths *= np.sqrt((1 + radial_velocity/cst.c)/(1- radial_velocity/cst.c))
 
         # return wavelengths, flux * r2d2 * unit_conv
-        return wavelengths, flux
+        if return_extras:
+            wavelengths_plot, flux_plot, additional_returned_quantities = atmosphere.calculate_flux(
+                temperatures=temperature,
+                mass_fractions=mfs,
+                mean_molar_masses=mean_molar_masses,
+                reference_gravity=reference_gravity,
+                cloud_particles_radius_distribution="hansen",
+                eddy_diffusion_coefficients=eddy_diffusion_coefficients,
+                cloud_f_sed=cloud_f_sed,
+                # cloud_particle_radius_distribution_std = cloud_particle_radius_distribution_std,
+                cloud_hansen_b=cloud_hansen_bs,
+                # cloud_fraction=1.0,
+                # complete_coverage_clouds=None,
+                return_contribution=True
+            )
+            return wavelengths, flux, pressures, temperature, mass_fractions, additional_returned_quantities['emission_contribution']
+        else:
+            return wavelengths, flux
 
     if rank==0:
         t_start = time.time()
@@ -340,7 +438,7 @@ if __name__ == '__main__':
         plt.errorbar(w, f, yerr=fe, label='jwst', marker='.', color='k', ls='none')
         plt.plot(w, s_test_f, label=ln, color='red')
         plt.legend()
-        plt.yscale('log')
+        plt.xscale('log')
         plt.savefig(output_dir+'test_alldata_generation.png')
 
     prior = Prior()
@@ -377,26 +475,38 @@ if __name__ == '__main__':
     prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
     prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
     prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
-    
+
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
-    prior.add_parameter('log_pquench', dist=(-3, 3))
+    prior.add_parameter('log_kzz_chem', dist=(-5, 25))
     # prior.add_parameter('C_iso', dist=(10, 200))
 
+    prior.add_parameter('fsed_SiO2(s)__DHS', dist=(1e-1, 10))
+    prior.add_parameter('fsed_MgSiO3(s)_amorphous__DHS', dist=(1e-1, 10))
+    prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-1, 10))
+    
+    prior.add_parameter('P_base_SiO2(s)__DHS', dist=(-6, 3))
+    # prior.add_parameter('P_base_MgSiO3(s)_amorphous__DHS', dist=(-6, 3))
+    # prior.add_parameter('P_base_Fe(s)_crystalline__DHS', dist=(-6, 3))
+    
+    prior.add_parameter('eq_scaling_SiO2(s)__DHS', dist=(-5, 1))
+    prior.add_parameter('eq_scaling_MgSiO3(s)_amorphous__DHS', dist=(-5, 1))
+    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-5, 1))
+    
+    prior.add_parameter('log_hansen_b_SiO2(s)__DHS', dist=(-1.5, -0.01))
+    prior.add_parameter('log_hansen_b_MgSiO3(s)_amorphous__DHS', dist=(-1.5, -0.01))
+    prior.add_parameter('log_hansen_b_Fe(s)_crystalline__DHS', dist=(-1.5, -0.01))
+    
     # prior.add_parameter('fsed', dist=(0.01, 10))
-    prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-2, 10))
-    prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-2, 10))
-    
-    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-4, 2))
-    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-4, 2))
-    
-    prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
-    prior.add_parameter('logKzz', dist=(4, 14))
+    # prior.add_parameter('log_hansen_b', dist=(-2, 0))
+    # prior.add_parameter('sigma_cloud', dist=(1.005, 3))
+    prior.add_parameter('log_kzz_cloud', dist=(4, 14))
 
     # prior.add_parameter('corr_len', dist=(-3, 0))
     # prior.add_parameter('corr_amp', dist=(0, 1))
 
     # prior.add_parameter('rv', dist=(-1000, 1000))
+    prior.add_parameter('e_hat', dist=(1e-2, 1e2))
 
 
     n_live = 640
@@ -425,8 +535,6 @@ if __name__ == '__main__':
     
     
         points, log_w, log_l = sampler.posterior()
-        # log_l = log_l[~np.isnan(points)]
-        # log_w = log_w[~np.isnan(points)]
         points[np.isnan(points)] = 0.0
         # print(points)
         corndog = corner.corner(
@@ -439,19 +547,63 @@ if __name__ == '__main__':
         print('log Z: {:.2f}'.format(sampler.log_z))
     
         best = points[np.where(log_l==np.nanmax(log_l))][0]
-    
         print('found best fit parameters:')
-        print(best)
+        best_dict = dict(zip(prior.keys, best))
+        print(best_dict)
+
+        best = np.median(points,axis=0) # need max a-posteriori
+        print('found median parameters:')
+        best_dict = dict(zip(prior.keys, best))
+        print(best_dict)
     
         best_params = default_params
         for i,param in enumerate(prior.keys):
             best_params[param] = best[i]
     
-        test_w, test_f = spectrum_generator(best_params)
+        allw, allf, p, t, mfs, contribution = spectrum_generator(best_params, return_extras=True)
         plt.figure()
-        s_test_f = spectres(w, test_w[0], test_f[0])
-        plt.errorbar(w, f, yerr=fe, label='jwst', marker='.', color='k', ls='none')
-        plt.plot(w, s_test_f, label=ln, color='red')
-        plt.yscale('log')
+        test_f = spectres(w, test_w[0], test_f[0])
+        plt.errorbar(w, f, yerr=fe, label='jwst', color='k', ls='none')
+        plt.plot(w, test_f, label=ln, color='red')
         plt.legend()
+        plt.xscale('log')
         plt.savefig(output_dir+f'best_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
+        
+        # plot p-T profile
+        plt.figure()
+        plt.plot(t, p, color='k')
+        plt.yscale('log')
+        plt.ylim(1e3, 1e-6)
+        plt.savefig(output_dir+f'pt_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
+        
+        # plot contribution function
+        
+        # Normalization
+        index = (contribution < 1e-16) & np.isnan(contribution)
+        contribution[index] = 1e-16
+
+        pressure_weights = np.diff(np.log10(p))
+        weights = np.ones_like(p)
+        weights[:-1] = pressure_weights
+        weights[-1] = weights[-2]
+        weights = weights / np.sum(weights)
+        weights = weights.reshape(len(weights), 1)
+
+        x, y = np.meshgrid(allw, p)
+
+        fig, ax = plt.subplots()
+        
+        plot_cont = contribution / weights
+        label = "Weighted Flux"
+
+        im = ax.contourf(x,
+                            y,
+                            plot_cont,
+                            30, # n contour levels
+                            cmap='magma')
+        ax.set_xlabel("Wavelength [$\mu$m]")
+        ax.set_ylabel("Pressure [bar]")
+        ax.set_yscale("log")
+        ax.set_ylim(p[-1] * 1.03, p[0] / 1.03)
+        plt.colorbar(im, ax=ax, label=label)
+        plt.savefig(output_dir+f'contribution_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')

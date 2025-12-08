@@ -143,7 +143,7 @@ if __name__ == '__main__':
         'fsed':1,
         # 'sigma_cloud':1.5,
         # 'log_hansen_b':0.1,
-        'log_hansen_b_MgSiO3(s)_crystalline__DHS':0.11,
+        'log_hansen_b_MgSiO3(s)_amorphous__DHS':0.11,
         'log_hansen_b_Fe(s)_crystalline__DHS':0.11,
         'log_kzz_cloud':10,
         # 'mmw':2.33,
@@ -271,7 +271,7 @@ if __name__ == '__main__':
     ]
     rayleigh_species = ['H2', 'He'] # why is the sky blue?
     gas_continuum_contributors = ['H2--H2', 'H2--He'] # these are important sources of opacity
-    cloud_species = ['MgSiO3(s)_crystalline__DHS',
+    cloud_species = ['MgSiO3(s)_amorphous__DHS',
                     'Fe(s)_crystalline__DHS'] # these will be important for clouds
 
     smresl = '160' # sphere model resolution, R=160 c-k
@@ -750,14 +750,14 @@ if __name__ == '__main__':
     prior.add_parameter('log_kzz_chem', dist=(-5, 25))
 
     # prior.add_parameter('fsed', dist=(0.01, 10))
-    prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-1, 10))
+    prior.add_parameter('fsed_MgSiO3(s)_amorphous__DHS', dist=(1e-1, 10))
     prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-1, 10))
     
-    # prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-5, 2))
+    # prior.add_parameter('eq_scaling_MgSiO3(s)_amorphous__DHS', dist=(-5, 2))
     # prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-5, 2))
 
     # prior.add_parameter('log_hansen_b', dist=(-2, 0))
-    prior.add_parameter('log_hansen_b_MgSiO3(s)_crystalline__DHS', dist=(-1.5, -0.01))
+    prior.add_parameter('log_hansen_b_MgSiO3(s)_amorphous__DHS', dist=(-1.5, -0.01))
     prior.add_parameter('log_hansen_b_Fe(s)_crystalline__DHS', dist=(-1.5, -0.01))
     
     # prior.add_parameter('sigma_cloud', dist=(1.005, 3))
