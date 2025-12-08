@@ -47,14 +47,14 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 
 
 # general setup
-retrieval_name = '2M0624_RUN'
+retrieval_name = '2M0624_SiO2TOP'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 
 # sampling parameters
 discard_exploration = False
 f_live = 0.01
-resume = True
+resume = False
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -96,14 +96,20 @@ if __name__ == '__main__':
         'Fe/H':0.0,
         'log_pquench':0.0,
         # 'fsed':4,
-        'sigma_lnorm':1.5,
-        'logKzz':10,
+        # 'sigma_lnorm':1.5,
+        'log_kzz_chem':10,
 
+        'fsed_SiO2(s)_amorphous__DHS':2,
         'fsed_MgSiO3(s)_amorphous__DHS':2,
         'fsed_Fe(s)_crystalline__DHS':2,
     
         'eq_scaling_MgSiO3(s)_amorphous__DHS':0,
-        'eq_scaling_Fe(s)_crystalline__DHS':0
+        'eq_scaling_Fe(s)_crystalline__DHS':0,
+
+        'log_hansen_b_SiO2(s)_amorphous__DHS':0.11,
+        'log_hansen_b_MgSiO3(s)_amorphous__DHS':0.11,
+        'log_hansen_b_Fe(s)_crystalline__DHS':0.11,
+        'log_kzz_cloud':10,
     }
 
     def likelihood(param_dict, debug=False):
@@ -121,8 +127,10 @@ if __name__ == '__main__':
         rb_f_i = spectres(w, w_i[0], f_i[0])
 
         if 'e_hat' in params:
-            fe = fe * params['e_hat']
-        
+            fe_i = fe * params['e_hat']
+        else:
+            fe_i = fe
+
         if debug:
             plt.figure()
             plt.plot(w, rb_f_i, color='k')
@@ -131,7 +139,7 @@ if __name__ == '__main__':
             # from Wang et al. 2020, species.fit.fit_model
             wavel_j, wavel_i = np.meshgrid(w, w)
 
-            error_j, error_i = np.meshgrid(fe, fe)
+            error_j, error_i = np.meshgrid(fe_i, fe_i)
 
             corr_len = 10.0 ** param_dict["corr_len"]  # (um)
             corr_amp = param_dict["corr_amp"]
@@ -151,7 +159,7 @@ if __name__ == '__main__':
             )
 
             ln_i += np.nansum(
-                np.log(2.0 * np.pi * fe**2)
+                np.log(2.0 * np.pi * fe_i**2)
             )
 
             ln_i *= -0.5
@@ -159,8 +167,8 @@ if __name__ == '__main__':
             ln += ln_i
         
         else:
-            chi2 = np.nansum(((f - rb_f_i)/fe)**2)
-            ln += -chi2/2 - np.nansum(np.log(2*np.pi*fe**2)/2)
+            chi2 = np.nansum(((f - rb_f_i)/fe_i)**2)
+            ln += -chi2/2 - np.nansum(np.log(2*np.pi*fe_i**2)/2)
             
         if debug:
             # plt.errorbar(w_i[0], f_i[0], marker='', color='red')
@@ -196,7 +204,7 @@ if __name__ == '__main__':
     rayleigh_species = ['H2', 'He'] # why is the sky blue?
     gas_continuum_contributors = ['H2--H2', 'H2--He'] # these are important sources of opacity
     cloud_species = [
-                    'SiO2(s)__DHS',
+                    'SiO2(s)_amorphous__DHS',
                     # 'SiO2(s)_amorphous__Mie',
                     # 'SiO(s)_amorphous__DHS',
                     # 'SiO(s)_amorphous__Mie',
