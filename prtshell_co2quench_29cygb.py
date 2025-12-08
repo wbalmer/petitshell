@@ -49,16 +49,17 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 
 # general setup
 # retrieval_name = '29Cygb_shell_kzzchem_onecloud'
-retrieval_name = '29Cygb_shell_kzzchem_threecloud_long'
+# retrieval_name = '29Cygb_shell_kzzchem_threecloud_long'
+retrieval_name = '29Cygb_shell_kzzchem_amsilicate'
 # retrieval_name = '29Cygb_shell_kzzchem'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 
 # sampling parameters
 discard_exploration = True
-f_live = 0.001
+f_live = 0.01
 n_live = 1000
-resume = True
+resume = False
 plot = False
 
 from pathlib import Path
@@ -118,11 +119,11 @@ if __name__ == '__main__':
         'logg':3.7,
 
         'T_bottom':7000.,
-        'N_layers':10,
-        'dPT_10':0.02,
-        'dPT_9':0.02,
-        'dPT_8':0.02,
-        'dPT_7':0.06,
+        'N_layers':6,
+        # 'dPT_10':0.02,
+        # 'dPT_9':0.02,
+        # 'dPT_8':0.02,
+        # 'dPT_7':0.06,
         'dPT_6':0.10,
         'dPT_5':0.12,
         'dPT_4':0.15,
@@ -273,7 +274,7 @@ if __name__ == '__main__':
     rayleigh_species = ['H2', 'He'] # why is the sky blue?
     gas_continuum_contributors = ['H2--H2', 'H2--He'] # these are important sources of opacity
     cloud_species = [
-                     'MgSiO3(s)_amorphous__DHS',
+                     'MgSiO3(s)_crystalline__DHS',
                      'Fe(s)_crystalline__DHS',
                      'Na2S(s)_crystalline__DHS',
                     ] # these will be important for clouds
@@ -722,21 +723,21 @@ if __name__ == '__main__':
     # prior.add_parameter('dPT_4', dist=norm(loc=0.21, scale=0.05))
     # prior.add_parameter('dPT_5', dist=norm(loc=0.16, scale=0.06))
     # prior.add_parameter('dPT_6', dist=norm(loc=0.08, scale=0.025))
-    prior.add_parameter('dPT_7', dist=norm(loc=0.06, scale=0.04))
-    prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
-    prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
-    prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
+    # prior.add_parameter('dPT_7', dist=norm(loc=0.06, scale=0.04))
+    # prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
+    # prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
+    # prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
     
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
     prior.add_parameter('log_kzz_chem', dist=(-5, 25))
 
     prior.add_parameter('fsed', dist=(0.01, 10))
-    # prior.add_parameter('fsed_MgSiO3(s)_amorphous__DHS', dist=(0.01, 10))
+    # prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(0.01, 10))
     # prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(0.01, 10))
     # prior.add_parameter('fsed_Na2S(s)_crystalline__DHS', dist=(0.01, 10))
     
-    prior.add_parameter('eq_scaling_MgSiO3(s)_amorphous__DHS', dist=(-10, 1))
+    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-10, 1))
     prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
     prior.add_parameter('eq_scaling_Na2S(s)_crystalline__DHS', dist=(-10, 1))
     
@@ -785,9 +786,12 @@ if __name__ == '__main__':
         plt.savefig(output_dir+f'cornerplot_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
         print('log Z: {:.2f}'.format(sampler.log_z))
     
-        # best = points[np.where(log_l==np.nanmax(log_l))][0] # max likelihood
+        best = points[np.where(log_l==np.nanmax(log_l))][0]
+        print('found best fit parameters:')
+        best_dict = dict(zip(prior.keys, best))
+        print(best_dict)
+
         best = np.median(points,axis=0) # need max a-posteriori
-    
         print('found median parameters:')
         best_dict = dict(zip(prior.keys, best))
         print(best_dict)
@@ -972,7 +976,7 @@ if __name__ == '__main__':
             fig, ax = plt.subplots()
             i = 0
             for key in list(mfs.keys()):
-                if key in ['H2', 'H2O', 'CO', 'CH4', 'CO2', 'MgSiO3(s)_amorphous__DHS']:
+                if key in ['H2', 'H2O', 'CO', 'CH4', 'CO2', 'MgSiO3(s)_crystalline__DHS']:
                     ax.plot(mfs[key], p, label=key)
             
             mass_fractions, mean_molar_masses, nabla_ad = chem.interpolate_mass_fractions(

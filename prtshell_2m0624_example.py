@@ -103,6 +103,7 @@ if __name__ == '__main__':
         'fsed_MgSiO3(s)_amorphous__DHS':2,
         'fsed_Fe(s)_crystalline__DHS':2,
     
+        'abund_SiO2(s)_amorphous__DHS':-5,
         'eq_scaling_MgSiO3(s)_amorphous__DHS':0,
         'eq_scaling_Fe(s)_crystalline__DHS':0,
 
@@ -350,7 +351,14 @@ if __name__ == '__main__':
             else:
                 cloud_f_sed[specie] = params['fsed']
             easy_chem_name = specie.split('_')[0].split('-')[0].split(".")[0]
+
             cmf = return_cloud_mass_fraction(specie, feh, co_ratio)
+            if np.sum(cmf) == 0:
+                try:
+                    cmf = np.ones_like(cmf) * (10 ** params['abund_' + specie])
+                except KeyError:
+                    raise KeyError(f"Need explicit abundance because {specie} cloud isn't supported by return_cloud_mass_fraction")
+
             if 'P_base_' + specie in params.keys():
                 cbases[easy_chem_name] = params[f'P_base_{specie}']
             else:
@@ -447,6 +455,7 @@ if __name__ == '__main__':
         plt.plot(w, s_test_f, label=ln, color='red')
         plt.legend()
         plt.xscale('log')
+        plt.yscale('log')
         plt.savefig(output_dir+'test_alldata_generation.png')
 
     prior = Prior()
@@ -497,7 +506,7 @@ if __name__ == '__main__':
     # prior.add_parameter('P_base_MgSiO3(s)_amorphous__DHS', dist=(-6, 3))
     # prior.add_parameter('P_base_Fe(s)_crystalline__DHS', dist=(-6, 3))
     
-    prior.add_parameter('eq_scaling_SiO2(s)__DHS', dist=(-5, 1))
+    prior.add_parameter('abund_SiO2(s)__DHS', dist=(-10, 0))
     prior.add_parameter('eq_scaling_MgSiO3(s)_amorphous__DHS', dist=(-5, 1))
     prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-5, 1))
     
@@ -575,6 +584,7 @@ if __name__ == '__main__':
         plt.plot(w, test_f, label=ln, color='red')
         plt.legend()
         plt.xscale('log')
+        plt.yscale('log')
         plt.savefig(output_dir+f'best_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
         
         # plot p-T profile
