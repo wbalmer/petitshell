@@ -48,16 +48,18 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 
 
 # general setup
-retrieval_name = '29Cygb_shell_kzzchem_onecloud'
+# retrieval_name = '29Cygb_shell_kzzchem_onecloud'
+retrieval_name = '29Cygb_shell_kzzchem_threecloud_long'
+# retrieval_name = '29Cygb_shell_kzzchem'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 
 # sampling parameters
-discard_exploration = False
-f_live = 0.01
+discard_exploration = True
+f_live = 0.001
 n_live = 1000
 resume = True
-plot = True
+plot = False
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -116,11 +118,11 @@ if __name__ == '__main__':
         'logg':3.7,
 
         'T_bottom':7000.,
-        'N_layers':6,
-        # 'dPT_10':0.02,
-        # 'dPT_9':0.02,
-        # 'dPT_8':0.02,
-        # 'dPT_7':0.06,
+        'N_layers':10,
+        'dPT_10':0.02,
+        'dPT_9':0.02,
+        'dPT_8':0.02,
+        'dPT_7':0.06,
         'dPT_6':0.10,
         'dPT_5':0.12,
         'dPT_4':0.15,
@@ -270,8 +272,10 @@ if __name__ == '__main__':
     ]
     rayleigh_species = ['H2', 'He'] # why is the sky blue?
     gas_continuum_contributors = ['H2--H2', 'H2--He'] # these are important sources of opacity
-    cloud_species = ['MgSiO3(s)_crystalline__DHS',
-                     # 'Fe(s)_crystalline__DHS'
+    cloud_species = [
+                     'MgSiO3(s)_crystalline__DHS',
+                     'Fe(s)_crystalline__DHS',
+                     'Na2S(s)_crystalline__DHS',
                     ] # these will be important for clouds
 
     smresl = '160' # sphere model resolution, R=160 c-k
@@ -718,21 +722,23 @@ if __name__ == '__main__':
     # prior.add_parameter('dPT_4', dist=norm(loc=0.21, scale=0.05))
     # prior.add_parameter('dPT_5', dist=norm(loc=0.16, scale=0.06))
     # prior.add_parameter('dPT_6', dist=norm(loc=0.08, scale=0.025))
-    # prior.add_parameter('dPT_7', dist=norm(loc=0.06, scale=0.04))
-    # prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
-    # prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
-    # prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
+    prior.add_parameter('dPT_7', dist=norm(loc=0.06, scale=0.04))
+    prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
+    prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
+    prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
     
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
     prior.add_parameter('log_kzz_chem', dist=(-5, 25))
 
-    # prior.add_parameter('fsed', dist=(0.01, 10))
-    prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
-    # prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-4, 10))
+    prior.add_parameter('fsed', dist=(0.01, 10))
+    # prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(0.01, 10))
+    # prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(0.01, 10))
+    # prior.add_parameter('fsed_Na2S(s)_crystalline__DHS', dist=(0.01, 10))
     
-    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-3.5, 1))
-    # prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
+    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-10, 1))
+    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
+    prior.add_parameter('eq_scaling_Na2S(s)_crystalline__DHS', dist=(-10, 1))
     
     prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
     prior.add_parameter('log_kzz_cloud', dist=(4, 14))
@@ -752,7 +758,7 @@ if __name__ == '__main__':
                           n_live=n_live,
                           filepath=checkpoint_file,
                           pool=pool,
-                          n_networks=192,
+                          n_networks=64,
                           resume=resume
                           )
         t_start = time.time()
@@ -779,16 +785,19 @@ if __name__ == '__main__':
         plt.savefig(output_dir+f'cornerplot_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
         print('log Z: {:.2f}'.format(sampler.log_z))
     
-        best = points[np.where(log_l==np.nanmax(log_l))][0]
+        # best = points[np.where(log_l==np.nanmax(log_l))][0] # max likelihood
+        best = np.median(points,axis=0) # need max a-posteriori
     
-        print('found best fit parameters:')
-        print(best)
+        print('found median parameters:')
+        best_dict = dict(zip(prior.keys, best))
+        print(best_dict)
     
         best_params = default_params
         for i,param in enumerate(prior.keys):
             best_params[param] = best[i]
     
         if plot:
+            print('plotting stuff')
             test_w, test_f, allw, allf, p, t, mfs, contribution = spectrum_generator(best_params, quench_co2_off_co=True, debug_abund=True, return_extras=True)
             
             axd = plt.figure(layout="constrained", figsize=(8,5)).subplot_mosaic(
@@ -825,13 +834,25 @@ if __name__ == '__main__':
 
             wl_m1, fl_m1 = allw, allf
 
-            snora, = axd['S'].plot(wl_m1, fl_m1*wl_m1, ls='-', color='dodgerblue', label=r'petitRADTRANS [M/H]=0.7')
+            best_feh = round(best_dict['Fe/H'],2)
+            print(best_feh)
+            snora, = axd['S'].plot(wl_m1, fl_m1*wl_m1, ls='-', color='dodgerblue', label='petitRADTRANS [M/H]='+str(best_feh))
             axd['E'].plot(wl_m1, fl_m1-fl_m1, ls='-', color='gray')
 
             chs = np.array([hw, hf, hfe]).T
 
             char_line = axd['S'].errorbar(chs[:,0], chs[:,1]*chs[:,0], yerr=chs[:,2], 
                                           marker='none', color='k', ls='none', label='Subaru')
+
+            sonr_char = spectres(chs[:,0], wl_m1, fl_m1)
+
+            char_resid = axd['E'].scatter(chs[:,0], (sonr_char-chs[:,1])/chs[:,2],
+                                          color='dodgerblue', alpha=1, marker="|")
+            
+            chs = np.array([sw, sf, sfe]).T
+
+            char_line = axd['S'].errorbar(chs[:,0], chs[:,1]*chs[:,0], yerr=chs[:,2], 
+                                          marker='none', color='k', ls='none')
 
             sonr_char = spectres(chs[:,0], wl_m1, fl_m1)
 
@@ -859,7 +880,7 @@ if __name__ == '__main__':
             nondet_label = "_nolegend_"
             for i,name in enumerate(pnames):
                 filt = name
-                w, f, fe = pws[i], pfs[i], pfes[i]
+                w, f, fe = np.mean(pws[i]), pfs[i], pfes[i]
                 transmission = ReadFilter(filt)
                 fwhm = transmission.filter_fwhm()
                 synphot = psyns[i]

@@ -44,7 +44,9 @@ from petitRADTRANS.chemistry.pre_calculated_chemistry import PreCalculatedEquili
 from petitRADTRANS.chemistry.utils import mass_fractions2volume_mixing_ratios as mf2vmr
 from petitRADTRANS.chemistry.utils import volume_mixing_ratios2mass_fractions as vmr2mf
 from petitRADTRANS.chemistry.clouds import return_cloud_mass_fraction, simple_cdf
-from petitRADTRANS.math import filter_spectrum_with_spline, convolve
+from petitRADTRANS.math import filter_spectrum_with_spline
+from petitRADTRANS.fortran_rebin import fortran_rebin as frebin
+from petitRADTRANS.fortran_convolve import fortran_convolve as fconvolve
 
 
 # general setup
@@ -104,9 +106,9 @@ if __name__ == '__main__':
     unit_conv = (u.erg/u.s/u.cm**2/u.cm).to(u.W/u.m**2/u.micron)
 
     default_params = {
-        'R_pl':1.3,
-        'plx':37.2539,
-        'logg':3.7,
+        'R_pl':1.0,
+        'plx':7.5,
+        'logg':5.0,
 
         'T_bottom':7000.,
         'N_layers':6,
@@ -137,7 +139,7 @@ if __name__ == '__main__':
         # 'corr_amp_ch':0.5 # [0, 1]
     }
 
-    def likelihood(param_dict, debug=True):
+    def likelihood(param_dict, debug=False):
 
         ln = 0
 
@@ -146,19 +148,28 @@ if __name__ == '__main__':
             params[param] = param_dict[param]
 
         w_i, f_i = spectrum_generator(params)
+        # print('generated spectrum')
 
         if debug:
             plt.figure()
             plt.plot(nsw, nsf, color='k')
 
         # compute nirspec likelihood
-        nirspec_resolution_array = np.interp(w_i[0], nsw, nirspec_resolution)
-        # convolve to resolution
-        cv_f_i = convolve(w_i[0], f_i[0], nirspec_resolution_array)
+
         # resample to wl grid
-        rb_f_i = spectres(nsw, w_i[0], cv_f_i) # TODO: use frebin instead of spectres
+        # rb_f_i = spectres(nsw, w_i[0], cv_f_i) # TODO: use frebin instead of spectres
+        rb_f_i = frebin.rebin_spectrum(w_i[0], f_i[0], nsw) # input w, input f, output w
+        # print('rebinned spectrum')
+
+        # nirspec_resolution_array = np.interp(w_i[0], nsw, nirspec_resolution)
+        # convolve to resolution # TODO: use fortran convolve
+        # cv_f_i = convolve(w_i[0], f_i[0], nirspec_resolution_array)
+        cv_f_i = fconvolve.variable_width_convolution(nsw, rb_f_i, nirspec_resolution) # input w, input f, res array
+        # print('convolved spectrum')
+        
         # subtract continuum
-        frb_f_i = filter_spectrum_with_spline(nsw,rb_f_i,x_nodes=x_nodes)
+        frb_f_i = filter_spectrum_with_spline(nsw,cv_f_i,x_nodes=x_nodes)
+        # print('continuum subtracted spectrum')
         
         if debug:
             plt.plot(nsw, frb_f_i, alpha=0.3, ls='--')
@@ -168,6 +179,7 @@ if __name__ == '__main__':
                 @ np.linalg.inv(nscov)
                 @ (nsf - frb_f_i)
             )
+        # print('did the inverse')
         
         if 'e_hat' in params:
             nsfe_i = nsfe * params['e_hat']
@@ -192,6 +204,7 @@ if __name__ == '__main__':
             ln_p_i = -chi2/2 - np.nansum(np.log(2*np.pi*pfes[i]**2)/2)
 
             ln_p += ln_p_i
+        # print('summed the photometry')
             
         ln += ln_p
             
@@ -200,6 +213,8 @@ if __name__ == '__main__':
             plt.errorbar(w_i, pfs, yerr=pfes, marker='o', color='k')
             plt.savefig(output_dir+'temp_spec.png')
             print(ln_ns, ln_p)
+        
+        # print('done with likelihood calc')
 
         return ln
 
@@ -208,7 +223,7 @@ if __name__ == '__main__':
     chem.load()
     # Load scattering version of pRT
 
-    rtpressures = np.logspace(-6, 3, 100) # set pressure range
+    rtpressures = np.logspace(-4, 2, 50) # set pressure range
     line_species = [
         'H2O',
         # 'CO-NatAbund',
@@ -242,12 +257,12 @@ if __name__ == '__main__':
         rayleigh_species = rayleigh_species, # why is the sky blue?
         gas_continuum_contributors = gas_continuum_contributors, # these are important sources of opacity
         cloud_species = cloud_species, # these will be important for clouds
-        wavelength_boundaries = [nsw[0]-0.1, nsw[-1]+0.1],
+        wavelength_boundaries = [nsw[0]-0.05, nsw[-1]+0.05],
         line_opacity_mode='lbl' # lbl or c-k
     )
 
-    w_lbl = frequency2wavelength(atmosphere_nirspec._frequencies)*1e4
-    nirspec_resolution_array = np.interp(w_lbl, nsw, nirspec_resolution)
+    # w_lbl = frequency2wavelength(atmosphere_nirspec._frequencies)*1e4
+    # nirspec_resolution_array = np.interp(w_lbl, nsw, nirspec_resolution) # native resolution
 
     atmosphere_photometrys = []
     ptmresl = '40' # photometry model resolution, R=40 c-k
@@ -675,6 +690,7 @@ if __name__ == '__main__':
     # prior.add_parameter('corr_amp_ch', dist=(0, 1))
 
     prior.add_parameter('rv', dist=(-1000, 1000))
+    prior.add_parameter('e_hat', dist=(0.1, 10))
 
     # run the sampler!
     print(f'starting pool with {os.cpu_count()} cores')

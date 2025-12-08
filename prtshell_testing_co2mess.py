@@ -48,15 +48,15 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 
 
 # general setup
-retrieval_name = 'AFLepb_shell_testkzzco2'
+retrieval_name = 'AFLepb_shell_testhansen'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 
 # sampling parameters
 discard_exploration = False
 f_live = 0.01
-resume = False
-plot = False
+resume = True
+plot = True
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -140,8 +140,11 @@ if __name__ == '__main__':
         'Fe/H':0.0,
         'log_kzz_chem':10,
         # 'C_iso':100,
-        'fsed':4,
-        'sigma_lnorm':1.5,
+        'fsed':1,
+        # 'sigma_cloud':1.5,
+        # 'log_hansen_b':0.1,
+        'log_hansen_b_MgSiO3(s)_crystalline__DHS':0.11,
+        'log_hansen_b_Fe(s)_crystalline__DHS':0.11,
         'log_kzz_cloud':10,
         # 'mmw':2.33,
         'corr_len_sphere':-1, # log10 [-3, 0] 
@@ -237,8 +240,8 @@ if __name__ == '__main__':
             
         if debug:
             plt.errorbar(w_i[2], f_i[2], marker='s', color='red')
-            plt.savefig('temp_spec.png')
-            print(ln_s, ln_g, ln_p)
+            plt.savefig(output_dir+'temp_spec.png')
+            # print(ln_s, ln_g, ln_p)
 
         return ln
 
@@ -526,7 +529,7 @@ if __name__ == '__main__':
             mass_fractions['13CO'] = mass_fractions['CO']/c_iso_ratio
             mass_fractions['12CO'] = mass_fractions['CO']-mass_fractions['13CO']
 
-        sigma_lnorm = params['sigma_lnorm']
+        # cloud_particle_radius_distribution_std = params['sigma_cloud']
         log_kzz_cloud = params['log_kzz_cloud']
 
         # mmw = params['mmw'] # we get mean_molar_masses from chem.interpolate instead of setting it ourselves
@@ -534,10 +537,10 @@ if __name__ == '__main__':
         mmw = np.mean(mean_molar_masses)
 
         eddy_diffusion_coefficients = np.ones_like(temperature)*1e1**log_kzz_cloud
-        cloud_particle_radius_distribution_std = sigma_lnorm
 
         cbases = {}
         cloud_f_sed = {}
+        cloud_hansen_bs = {} # 10**params['log_hansen_b']
         for specie in atmosphere_sphere.cloud_species:
             if 'fsed_' + specie in params.keys():
                 cloud_f_sed[specie] = params[f'fsed_{specie}']
@@ -549,6 +552,11 @@ if __name__ == '__main__':
             cbases[easy_chem_name] = cbase
             mass_fractions_cloud = np.zeros_like(temperature)
             mass_fractions_cloud[pressures<=cbase] = cmf * (pressures[pressures<=cbase] / cbase) ** cloud_f_sed[specie]
+
+            if 'log_hansen_b_' + specie in params.keys():
+                cloud_hansen_bs[specie] = 10**params[f'log_hansen_b_{specie}'] * np.ones_like(pressures)
+            else:
+                cloud_hansen_bs[specie] = 10**params['log_hansen_b'] * np.ones_like(pressures)
             
             if "eq_scaling_" + specie in params.keys():
                 mass_fractions_cloud *= (10 ** params['eq_scaling_' + specie]) # Scaled by a constant factor
@@ -584,9 +592,13 @@ if __name__ == '__main__':
             mass_fractions=smfs,
             mean_molar_masses=mean_molar_masses,
             reference_gravity=reference_gravity,
+            cloud_particles_radius_distribution="hansen",
             eddy_diffusion_coefficients=eddy_diffusion_coefficients,
             cloud_f_sed=cloud_f_sed,
-            cloud_particle_radius_distribution_std = cloud_particle_radius_distribution_std,
+            # cloud_particle_radius_distribution_std = cloud_particle_radius_distribution_std,
+            cloud_hansen_b=cloud_hansen_bs,
+            # cloud_fraction=1.0,
+            # complete_coverage_clouds=None,
             return_contribution=False
         )
 
@@ -595,9 +607,13 @@ if __name__ == '__main__':
             mass_fractions=gmfs,
             mean_molar_masses=mean_molar_masses,
             reference_gravity=reference_gravity,
+            cloud_particles_radius_distribution="hansen",
             eddy_diffusion_coefficients=eddy_diffusion_coefficients,
             cloud_f_sed=cloud_f_sed,
-            cloud_particle_radius_distribution_std = cloud_particle_radius_distribution_std,
+            # cloud_particle_radius_distribution_std = cloud_particle_radius_distribution_std,
+            cloud_hansen_b=cloud_hansen_bs,
+            # cloud_fraction=1.0,
+            # complete_coverage_clouds=None,
             return_contribution=False
         )
 
@@ -609,9 +625,13 @@ if __name__ == '__main__':
                 mass_fractions=ptmfs,
                 mean_molar_masses=mean_molar_masses,
                 reference_gravity=reference_gravity,
+                cloud_particles_radius_distribution="hansen",
                 eddy_diffusion_coefficients=eddy_diffusion_coefficients,
                 cloud_f_sed=cloud_f_sed,
-                cloud_particle_radius_distribution_std = cloud_particle_radius_distribution_std,
+                # cloud_particle_radius_distribution_std = cloud_particle_radius_distribution_std,
+                cloud_hansen_b=cloud_hansen_bs,
+                # cloud_fraction=1.0,
+                # complete_coverage_clouds=None,
                 return_contribution=False
             )
             synphot = psyns[i]
@@ -619,10 +639,10 @@ if __name__ == '__main__':
             integrated_flux, _ = synphot.spectrum_to_flux(wavelengths_phot_i*1e4, flux_gravity_phot_i* r2d2 * unit_conv) # careful of output here, bc it gives tuple flux, err
 
             phot_wavels.append(np.nanmean(wavelengths_phot_i*1e4))
-            phot_fluxes.append(integrated_flux)
+            phot_fluxes.append(np.nan_to_num(integrated_flux))
 
         wavelengths = [wavelengths_sphere*1e4, wavelengths_gravity*1e4, phot_wavels]
-        flux = [flux_sphere * r2d2 * unit_conv, flux_gravity * r2d2 * unit_conv, phot_fluxes]
+        flux = [np.nan_to_num(flux_sphere) * r2d2 * unit_conv, np.nan_to_num(flux_gravity) * r2d2 * unit_conv, phot_fluxes]
 
         if return_extras:
             if plot:
@@ -631,9 +651,13 @@ if __name__ == '__main__':
                     mass_fractions=gmfs,
                     mean_molar_masses=mean_molar_masses,
                     reference_gravity=reference_gravity,
+                    cloud_particles_radius_distribution="hansen",
                     eddy_diffusion_coefficients=eddy_diffusion_coefficients,
                     cloud_f_sed=cloud_f_sed,
-                    cloud_particle_radius_distribution_std = cloud_particle_radius_distribution_std,
+                    # cloud_particle_radius_distribution_std = cloud_particle_radius_distribution_std,
+                    cloud_hansen_b=cloud_hansen_bs,
+                    # cloud_fraction=1.0,
+                    # complete_coverage_clouds=None,
                     return_contribution=True
                 )
                 return wavelengths, flux, wavelengths_plot*1e4, flux_plot* r2d2 * unit_conv, pressures, temperature, mass_fractions, additional_returned_quantities['emission_contribution']
@@ -726,13 +750,17 @@ if __name__ == '__main__':
     prior.add_parameter('log_kzz_chem', dist=(-5, 25))
 
     # prior.add_parameter('fsed', dist=(0.01, 10))
-    prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-2, 10))
-    prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-2, 10))
+    prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-1, 10))
+    prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-1, 10))
     
-    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-5, 2))
-    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-5, 2))
+    # prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-5, 2))
+    # prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-5, 2))
+
+    # prior.add_parameter('log_hansen_b', dist=(-2, 0))
+    prior.add_parameter('log_hansen_b_MgSiO3(s)_crystalline__DHS', dist=(-1.5, -0.01))
+    prior.add_parameter('log_hansen_b_Fe(s)_crystalline__DHS', dist=(-1.5, -0.01))
     
-    prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
+    # prior.add_parameter('sigma_cloud', dist=(1.005, 3))
     prior.add_parameter('log_kzz_cloud', dist=(4, 14))
 
     prior.add_parameter('corr_len_sphere', dist=(-3, 0))
@@ -744,16 +772,16 @@ if __name__ == '__main__':
     n_live = 1000
 
     # run the sampler!
-    # print(f'starting pool with {os.cpu_count()} cores')
-    # with mp.Pool(os.cpu_count()) as pool:
-    print(f'starting pool with {size} processes')
-    comm.Barrier()
-    with MPIPool() as pool:
+    print(f'starting pool with {os.cpu_count()} cores')
+    with mp.Pool(os.cpu_count()) as pool:
+    # print(f'starting pool with {size} processes')
+    # comm.Barrier()
+    # with MPIPool() as pool:
         sampler = Sampler(prior, likelihood,
                           n_live=n_live,
                           filepath=checkpoint_file,
                           pool=pool,
-                          n_networks=4,
+                          n_networks=64,
                           resume=resume
                           )
         t_start = time.time()
@@ -781,9 +809,14 @@ if __name__ == '__main__':
         print('log Z: {:.2f}'.format(sampler.log_z))
     
         best = points[np.where(log_l==np.nanmax(log_l))][0]
-    
         print('found best fit parameters:')
-        print(best)
+        best_dict = dict(zip(prior.keys, best))
+        print(best_dict)
+
+        best = np.median(points,axis=0) # need max a-posteriori
+        print('found median parameters:')
+        best_dict = dict(zip(prior.keys, best))
+        print(best_dict)
     
         best_params = default_params
         for i,param in enumerate(prior.keys):
