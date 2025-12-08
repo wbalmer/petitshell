@@ -274,7 +274,7 @@ if __name__ == '__main__':
     rayleigh_species = ['H2', 'He'] # why is the sky blue?
     gas_continuum_contributors = ['H2--H2', 'H2--He'] # these are important sources of opacity
     cloud_species = [
-                     'MgSiO3(s)_crystalline__DHS',
+                     'MgSiO3(s)_amorphous__DHS',
                      'Fe(s)_crystalline__DHS',
                      'Na2S(s)_crystalline__DHS',
                     ] # these will be important for clouds
@@ -733,11 +733,11 @@ if __name__ == '__main__':
     prior.add_parameter('log_kzz_chem', dist=(-5, 25))
 
     prior.add_parameter('fsed', dist=(0.01, 10))
-    # prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(0.01, 10))
+    # prior.add_parameter('fsed_MgSiO3(s)_amorphous__DHS', dist=(0.01, 10))
     # prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(0.01, 10))
     # prior.add_parameter('fsed_Na2S(s)_crystalline__DHS', dist=(0.01, 10))
     
-    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-10, 1))
+    prior.add_parameter('eq_scaling_MgSiO3(s)_amorphous__DHS', dist=(-10, 1))
     prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
     prior.add_parameter('eq_scaling_Na2S(s)_crystalline__DHS', dist=(-10, 1))
     
@@ -976,7 +976,7 @@ if __name__ == '__main__':
             fig, ax = plt.subplots()
             i = 0
             for key in list(mfs.keys()):
-                if key in ['H2', 'H2O', 'CO', 'CH4', 'CO2', 'MgSiO3(s)_crystalline__DHS']:
+                if key in ['H2', 'H2O', 'CO', 'CH4', 'CO2', 'MgSiO3(s)_amorphous__DHS']:
                     ax.plot(mfs[key], p, label=key)
             
             mass_fractions, mean_molar_masses, nabla_ad = chem.interpolate_mass_fractions(

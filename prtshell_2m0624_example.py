@@ -17,7 +17,7 @@ import multiprocess as mp
 import warnings
 import corner
 import astropy.units as u
-from scipy.stats import norm, truncnorm
+from scipy.stats import norm, truncnorm, loguniform
 import matplotlib.pyplot as plt
 from spectres import spectres
 from species import SpeciesInit
@@ -44,6 +44,8 @@ from petitRADTRANS.radtrans import Radtrans # <--- this is our "spectrum generat
 from petitRADTRANS.chemistry.pre_calculated_chemistry import PreCalculatedEquilibriumChemistryTable
 from petitRADTRANS.chemistry.clouds import return_cloud_mass_fraction, simple_cdf
 from petitRADTRANS.math import filter_spectrum_with_spline
+
+warnings.filterwarnings("once", category=UserWarning, module="petitRADTRANS.chemistry.clouds") # just to keep the warning about unimplemented clouds from filling the output
 
 
 # general setup
@@ -99,11 +101,11 @@ if __name__ == '__main__':
         # 'sigma_lnorm':1.5,
         'log_kzz_chem':10,
 
-        'fsed_SiO2(s)_amorphous__DHS':2,
+        'fsed_SiO2(s)_amorphous__DHS':0.2,
         'fsed_MgSiO3(s)_amorphous__DHS':2,
         'fsed_Fe(s)_crystalline__DHS':2,
     
-        'abund_SiO2(s)_amorphous__DHS':-5,
+        'abund_SiO2(s)_amorphous__DHS':-1,
         'eq_scaling_MgSiO3(s)_amorphous__DHS':0,
         'eq_scaling_Fe(s)_crystalline__DHS':0,
 
@@ -523,7 +525,7 @@ if __name__ == '__main__':
     # prior.add_parameter('corr_amp', dist=(0, 1))
 
     # prior.add_parameter('rv', dist=(-1000, 1000))
-    prior.add_parameter('e_hat', dist=(1e-2, 1e2))
+    prior.add_parameter('e_hat', dist=loguniform(1, 1e2))
 
 
     n_live = 640
@@ -535,12 +537,12 @@ if __name__ == '__main__':
     # comm.Barrier()
     # with MPIPool() as pool:
         sampler = Sampler(prior, likelihood,
-                          n_live=n_live,
-                          filepath=checkpoint_file,
-                          pool=pool,
-                          n_networks=4,
-                          resume=resume
-                          )
+                        n_live=n_live,
+                        filepath=checkpoint_file,
+                        pool=pool,
+                        n_networks=64,
+                        resume=resume
+                        )
         t_start = time.time()
         sampler.run(f_live=f_live, # default is 0.01, fract of evidence in live set before termination 
                     discard_exploration=discard_exploration, # true for publication ready? fully unbiased
