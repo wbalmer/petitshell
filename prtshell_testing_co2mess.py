@@ -48,14 +48,14 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 
 
 # general setup
-retrieval_name = 'AFLepb_shell_testhansen'
+retrieval_name = 'AFLepb_shell_hansen-am-sili-decouplekzz-unifrad'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 
 # sampling parameters
 discard_exploration = False
 f_live = 0.01
-resume = True
+resume = False
 plot = True
 
 from pathlib import Path
@@ -142,9 +142,9 @@ if __name__ == '__main__':
         # 'C_iso':100,
         'fsed':1,
         # 'sigma_cloud':1.5,
-        # 'log_hansen_b':0.1,
-        'log_hansen_b_MgSiO3(s)_amorphous__DHS':0.11,
-        'log_hansen_b_Fe(s)_crystalline__DHS':0.11,
+        # 'hansen_b':0.1,
+        'hansen_b_MgSiO3(s)_amorphous__DHS':0.11,
+        'hansen_b_Fe(s)_crystalline__DHS':0.11,
         'log_kzz_cloud':10,
         # 'mmw':2.33,
         'corr_len_sphere':-1, # log10 [-3, 0] 
@@ -530,7 +530,10 @@ if __name__ == '__main__':
             mass_fractions['12CO'] = mass_fractions['CO']-mass_fractions['13CO']
 
         # cloud_particle_radius_distribution_std = params['sigma_cloud']
-        log_kzz_cloud = params['log_kzz_cloud']
+        if 'log_kzz_cloud' in params.keys():
+            log_kzz_cloud = params['log_kzz_cloud']
+        else:
+            log_kzz_cloud = params['log_kzz_chem']
 
         # mmw = params['mmw'] # we get mean_molar_masses from chem.interpolate instead of setting it ourselves
         # mean_molar_masses = mmw * np.ones_like(temperature)
@@ -540,7 +543,7 @@ if __name__ == '__main__':
 
         cbases = {}
         cloud_f_sed = {}
-        cloud_hansen_bs = {} # 10**params['log_hansen_b']
+        cloud_hansen_bs = {} # params['hansen_b']
         for specie in atmosphere_sphere.cloud_species:
             if 'fsed_' + specie in params.keys():
                 cloud_f_sed[specie] = params[f'fsed_{specie}']
@@ -553,10 +556,10 @@ if __name__ == '__main__':
             mass_fractions_cloud = np.zeros_like(temperature)
             mass_fractions_cloud[pressures<=cbase] = cmf * (pressures[pressures<=cbase] / cbase) ** cloud_f_sed[specie]
 
-            if 'log_hansen_b_' + specie in params.keys():
-                cloud_hansen_bs[specie] = 10**params[f'log_hansen_b_{specie}'] * np.ones_like(pressures)
+            if 'hansen_b_' + specie in params.keys():
+                cloud_hansen_bs[specie] = params[f'hansen_b_{specie}'] * np.ones_like(pressures)
             else:
-                cloud_hansen_bs[specie] = 10**params['log_hansen_b'] * np.ones_like(pressures)
+                cloud_hansen_bs[specie] = params['hansen_b'] * np.ones_like(pressures)
             
             if "eq_scaling_" + specie in params.keys():
                 mass_fractions_cloud *= (10 ** params['eq_scaling_' + specie]) # Scaled by a constant factor
@@ -707,10 +710,11 @@ if __name__ == '__main__':
 
     prior = Prior()
     
-    mu_radius = 1.3
-    sigma_radius = 0.03
-    a_radius, b_radius = (0.75 - mu_radius) / sigma_radius, (2.0 - mu_radius) / sigma_radius
-    prior.add_parameter('R_pl', dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius))
+    # mu_radius = 1.3
+    # sigma_radius = 0.03
+    # a_radius, b_radius = (0.75 - mu_radius) / sigma_radius, (2.0 - mu_radius) / sigma_radius
+    # prior.add_parameter('R_pl', dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius))
+    prior.add_parameter('R_pl', dist=(0.75, 2.0))
     
     # mu_mass = 15
     # sigma_mass = 5
@@ -757,8 +761,8 @@ if __name__ == '__main__':
     # prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-5, 2))
 
     # prior.add_parameter('log_hansen_b', dist=(-2, 0))
-    prior.add_parameter('log_hansen_b_MgSiO3(s)_amorphous__DHS', dist=(-1.5, -0.01))
-    prior.add_parameter('log_hansen_b_Fe(s)_crystalline__DHS', dist=(-1.5, -0.01))
+    prior.add_parameter('hansen_b_MgSiO3(s)_amorphous__DHS', dist=(0.0, 1.0))
+    prior.add_parameter('hansen_b_Fe(s)_crystalline__DHS', dist=(0.0, 1.0))
     
     # prior.add_parameter('sigma_cloud', dist=(1.005, 3))
     prior.add_parameter('log_kzz_cloud', dist=(4, 14))
@@ -807,14 +811,14 @@ if __name__ == '__main__':
         )
         plt.savefig(output_dir+f'cornerplot_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
         print('log Z: {:.2f}'.format(sampler.log_z))
-    
-        best = points[np.where(log_l==np.nanmax(log_l))][0]
-        print('found best fit parameters:')
-        best_dict = dict(zip(prior.keys, best))
-        print(best_dict)
 
         best = np.median(points,axis=0) # need max a-posteriori
         print('found median parameters:')
+        best_dict = dict(zip(prior.keys, best))
+        print(best_dict)
+
+        best = points[np.where(log_l==np.nanmax(log_l))][0]
+        print('found best fit parameters:')
         best_dict = dict(zip(prior.keys, best))
         print(best_dict)
     

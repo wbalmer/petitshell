@@ -45,9 +45,6 @@ from petitRADTRANS.chemistry.pre_calculated_chemistry import PreCalculatedEquili
 from petitRADTRANS.chemistry.clouds import return_cloud_mass_fraction, simple_cdf
 from petitRADTRANS.math import filter_spectrum_with_spline
 
-warnings.filterwarnings("once", category=UserWarning, module="petitRADTRANS.chemistry.clouds") # just to keep the warning about unimplemented clouds from filling the output
-
-
 # general setup
 retrieval_name = '2M0624_SiO2TOP'
 output_dir = retrieval_name+'_outputs/'
@@ -96,7 +93,7 @@ if __name__ == '__main__':
 
         'C/O':0.55,
         'Fe/H':0.0,
-        'log_pquench':0.0,
+        # 'log_pquench':0.0,
         # 'fsed':4,
         # 'sigma_lnorm':1.5,
         'log_kzz_chem':10,
@@ -104,14 +101,16 @@ if __name__ == '__main__':
         'fsed_SiO2(s)_amorphous__DHS':0.2,
         'fsed_MgSiO3(s)_amorphous__DHS':2,
         'fsed_Fe(s)_crystalline__DHS':2,
-    
-        'abund_SiO2(s)_amorphous__DHS':-1,
+
+        'log_P_base_SiO2(s)__DHS':-4,
+        'abund_SiO2(s)_amorphous__DHS':-5,
+        
         'eq_scaling_MgSiO3(s)_amorphous__DHS':0,
         'eq_scaling_Fe(s)_crystalline__DHS':0,
 
-        'log_hansen_b_SiO2(s)_amorphous__DHS':0.11,
-        'log_hansen_b_MgSiO3(s)_amorphous__DHS':0.11,
-        'log_hansen_b_Fe(s)_crystalline__DHS':0.11,
+        'hansen_b_SiO2(s)_amorphous__DHS':0.11,
+        'hansen_b_MgSiO3(s)_amorphous__DHS':0.11,
+        'hansen_b_Fe(s)_crystalline__DHS':0.11,
         'log_kzz_cloud':10,
     }
 
@@ -129,20 +128,23 @@ if __name__ == '__main__':
 
         rb_f_i = spectres(w, w_i[0], f_i[0])
 
+        if np.isnan(np.sum(rb_f_i)):
+            return -np.inf
+
         if 'e_hat' in params:
-            fe_i = fe * params['e_hat']
+            e_hat = params['e_hat']
         else:
-            fe_i = fe
+            e_hat = 1
 
         if debug:
             plt.figure()
-            plt.plot(w, rb_f_i, color='k')
+            plt.errorbar(w, f, yerr=fe*e_hat, ls='none', marker='', color='k')
 
         if 'corr_len' in param_dict.keys():
             # from Wang et al. 2020, species.fit.fit_model
             wavel_j, wavel_i = np.meshgrid(w, w)
 
-            error_j, error_i = np.meshgrid(fe_i, fe_i)
+            error_j, error_i = np.meshgrid(fe, fe)
 
             corr_len = 10.0 ** param_dict["corr_len"]  # (um)
             corr_amp = param_dict["corr_amp"]
@@ -162,7 +164,7 @@ if __name__ == '__main__':
             )
 
             ln_i += np.nansum(
-                np.log(2.0 * np.pi * fe_i**2)
+                np.log(2.0 * np.pi * (fe*e_hat)**2)
             )
 
             ln_i *= -0.5
@@ -170,14 +172,15 @@ if __name__ == '__main__':
             ln += ln_i
         
         else:
-            chi2 = np.nansum(((f - rb_f_i)/fe_i)**2)
-            ln += -chi2/2 - np.nansum(np.log(2*np.pi*fe_i**2)/2)
+            chi2 = np.nansum(((f - rb_f_i)/(fe*e_hat))**2)
+            ln += -chi2/2 - np.nansum(np.log(2*np.pi*(fe*e_hat)**2)/2)
             
         if debug:
-            # plt.errorbar(w_i[0], f_i[0], marker='', color='red')
+            plt.errorbar(w, rb_f_i, marker='', color='red')
             plt.yscale('log')
             plt.savefig(output_dir+'temp_spec.png')
-            # print(ln)
+            plt.close()
+            print(ln)
 
         return ln
 
@@ -267,7 +270,7 @@ if __name__ == '__main__':
             # print(crossing)
             p_quench = (pressures[1:] + pressures[:-1])[crossing] / 2.0
             # print(p_quench)
-            p_quench = np.max(p_quench)
+            p_quench = np.nanmax(p_quench)
             # print(p_quench)
             # crash
         return p_quench
@@ -306,26 +309,25 @@ if __name__ == '__main__':
         co_ratios = co_ratio * np.ones_like(pressures)
         log10_metallicities = feh * np.ones_like(pressures)
 
+        # mass_fractions, mean_molar_masses, nabla_ad = chem.interpolate_mass_fractions(
+        #     co_ratios=co_ratios,
+        #     log10_metallicities=log10_metallicities,
+        #     temperatures=temperature,
+        #     pressures=pressures,
+        #     full=True
+        # )
+        mmw_init = np.ones_like(pressures) * 2.33
+
+        p_quench = kzz_to_co_pquench(temperature, pressures, mmw_init, reference_gravity, log_kzz_chem, log10_metallicities)
+
         mass_fractions, mean_molar_masses, nabla_ad = chem.interpolate_mass_fractions(
             co_ratios=co_ratios,
             log10_metallicities=log10_metallicities,
             temperatures=temperature,
             pressures=pressures,
+            carbon_pressure_quench=p_quench,
             full=True
         )
-
-        p_quench = kzz_to_co_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_kzz_chem, log10_metallicities)
-
-        if p_quench is not None:
-
-            mass_fractions, mean_molar_masses, nabla_ad = chem.interpolate_mass_fractions(
-                co_ratios=co_ratios,
-                log10_metallicities=log10_metallicities,
-                temperatures=temperature,
-                pressures=pressures,
-                carbon_pressure_quench=p_quench,
-                full=True
-            )
 
         if '13CO' in atmosphere.line_species:
             c_iso_ratio = params['C_iso']
@@ -356,23 +358,23 @@ if __name__ == '__main__':
 
             cmf = return_cloud_mass_fraction(specie, feh, co_ratio)
             if np.sum(cmf) == 0:
-                try:
-                    cmf = np.ones_like(cmf) * (10 ** params['abund_' + specie])
-                except KeyError:
-                    raise KeyError(f"Need explicit abundance because {specie} cloud isn't supported by return_cloud_mass_fraction")
+                # try:
+                cmf = np.ones_like(cmf) * (10 ** params['abund_' + specie])
+                # except KeyError:
+                #     raise KeyError(f"Need explicit abundance because {specie} cloud isn't supported by return_cloud_mass_fraction")
 
-            if 'P_base_' + specie in params.keys():
-                cbases[easy_chem_name] = params[f'P_base_{specie}']
+            if 'log_P_base_' + specie in params.keys():
+                cbases[easy_chem_name] = 10**params[f'log_P_base_{specie}']
             else:
-                cbase = simple_cdf(specie, pressures, temperature, feh, co_ratio, mmw=mmw)
-                cbases[easy_chem_name] = cbase
+                cbases[easy_chem_name] = simple_cdf(specie, pressures, temperature, feh, co_ratio, mmw=mmw)
+            cbase = cbases[easy_chem_name]
             mass_fractions_cloud = np.zeros_like(temperature)
             mass_fractions_cloud[pressures<=cbase] = cmf * (pressures[pressures<=cbase] / cbase) ** cloud_f_sed[specie]
 
-            if 'log_hansen_b_' + specie in params.keys():
-                cloud_hansen_bs[specie] = 10**params[f'log_hansen_b_{specie}'] * np.ones_like(pressures)
+            if 'hansen_b_' + specie in params.keys():
+                cloud_hansen_bs[specie] = params[f'hansen_b_{specie}'] * np.ones_like(pressures)
             else:
-                cloud_hansen_bs[specie] = 10**params['log_hansen_b'] * np.ones_like(pressures)
+                cloud_hansen_bs[specie] = params['hansen_b'] * np.ones_like(pressures)
             
             if "eq_scaling_" + specie in params.keys():
                 mass_fractions_cloud *= (10 ** params['eq_scaling_' + specie]) # Scaled by a constant factor
@@ -462,10 +464,11 @@ if __name__ == '__main__':
 
     prior = Prior()
     
-    mu_radius = 1.0
-    sigma_radius = 0.1
-    a_radius, b_radius = (0.5 - mu_radius) / sigma_radius, (2.0 - mu_radius) / sigma_radius
-    prior.add_parameter('R_pl', dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius))
+    # mu_radius = 1.0
+    # sigma_radius = 0.1
+    # a_radius, b_radius = (0.5 - mu_radius) / sigma_radius, (2.0 - mu_radius) / sigma_radius
+    # prior.add_parameter('R_pl', dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius))
+    prior.add_parameter('R_pl', dist=(0.5, 2.0))
     prior.add_parameter('logg', dist=(3.0, 6.0))
     
     prior.add_parameter('plx', dist=norm(loc=82.0248, scale=0.3583))
@@ -490,21 +493,21 @@ if __name__ == '__main__':
     prior.add_parameter('dPT_4', dist=norm(loc=0.21, scale=0.05))
     prior.add_parameter('dPT_5', dist=norm(loc=0.16, scale=0.06))
     prior.add_parameter('dPT_6', dist=norm(loc=0.08, scale=0.025))
-    prior.add_parameter('dPT_7', dist=norm(loc=0.06, scale=0.02))
+    prior.add_parameter('dPT_7', dist=norm(loc=0.06, scale=0.1))
     prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
     prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
     prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
 
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
-    prior.add_parameter('log_kzz_chem', dist=(-5, 25))
+    prior.add_parameter('log_kzz_chem', dist=(4, 14))
     # prior.add_parameter('C_iso', dist=(10, 200))
 
     prior.add_parameter('fsed_SiO2(s)__DHS', dist=(1e-1, 10))
     prior.add_parameter('fsed_MgSiO3(s)_amorphous__DHS', dist=(1e-1, 10))
     prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-1, 10))
     
-    prior.add_parameter('P_base_SiO2(s)__DHS', dist=(-6, 3))
+    prior.add_parameter('log_P_base_SiO2(s)__DHS', dist=(-6, 3))
     # prior.add_parameter('P_base_MgSiO3(s)_amorphous__DHS', dist=(-6, 3))
     # prior.add_parameter('P_base_Fe(s)_crystalline__DHS', dist=(-6, 3))
     
@@ -512,9 +515,9 @@ if __name__ == '__main__':
     prior.add_parameter('eq_scaling_MgSiO3(s)_amorphous__DHS', dist=(-5, 1))
     prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-5, 1))
     
-    prior.add_parameter('log_hansen_b_SiO2(s)__DHS', dist=(-1.5, -0.01))
-    prior.add_parameter('log_hansen_b_MgSiO3(s)_amorphous__DHS', dist=(-1.5, -0.01))
-    prior.add_parameter('log_hansen_b_Fe(s)_crystalline__DHS', dist=(-1.5, -0.01))
+    prior.add_parameter('hansen_b_SiO2(s)__DHS', dist=(0.0, 0.5))
+    prior.add_parameter('hansen_b_MgSiO3(s)_amorphous__DHS', dist=(0.0, 0.5))
+    prior.add_parameter('hansen_b_Fe(s)_crystalline__DHS', dist=(0.0, 0.5))
     
     # prior.add_parameter('fsed', dist=(0.01, 10))
     # prior.add_parameter('log_hansen_b', dist=(-2, 0))
@@ -525,7 +528,7 @@ if __name__ == '__main__':
     # prior.add_parameter('corr_amp', dist=(0, 1))
 
     # prior.add_parameter('rv', dist=(-1000, 1000))
-    prior.add_parameter('e_hat', dist=loguniform(1, 1e2))
+    # prior.add_parameter('e_hat', dist=loguniform(1, 1e2))
 
 
     n_live = 640

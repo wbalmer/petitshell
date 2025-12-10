@@ -50,7 +50,7 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 # general setup
 # retrieval_name = '29Cygb_shell_kzzchem_onecloud'
 # retrieval_name = '29Cygb_shell_kzzchem_threecloud_long'
-retrieval_name = '29Cygb_shell_kzzchem_amsilicate'
+retrieval_name = '29Cygb_shell_kzzchem_amsilicate_twocloud'
 # retrieval_name = '29Cygb_shell_kzzchem'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
@@ -242,10 +242,14 @@ if __name__ == '__main__':
             
         if debug:
             plt.errorbar(w_i[2], f_i[2], marker='s', color='red')
-            plt.savefig('temp_spec.png')
-            print(ln_h, ln_g, ln_p)
+            plt.savefig(output_dir+'temp_spec.png')
+            plt.close()
+            # print(ln_h, ln_g, ln_p)
 
-        return ln
+        if np.isnan(ln):
+            return -np.inf
+        else:
+            return ln
 
 
     chem = PreCalculatedEquilibriumChemistryTable()
@@ -276,7 +280,7 @@ if __name__ == '__main__':
     cloud_species = [
                      'MgSiO3(s)_amorphous__DHS',
                      'Fe(s)_crystalline__DHS',
-                     'Na2S(s)_crystalline__DHS',
+                    #  'Na2S(s)_crystalline__DHS',
                     ] # these will be important for clouds
 
     smresl = '160' # sphere model resolution, R=160 c-k
@@ -732,16 +736,16 @@ if __name__ == '__main__':
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
     prior.add_parameter('log_kzz_chem', dist=(-5, 25))
 
-    prior.add_parameter('fsed', dist=(0.01, 10))
-    # prior.add_parameter('fsed_MgSiO3(s)_amorphous__DHS', dist=(0.01, 10))
-    # prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(0.01, 10))
+    # prior.add_parameter('fsed', dist=(0.01, 10))
+    prior.add_parameter('fsed_MgSiO3(s)_amorphous__DHS', dist=(0.01, 10))
+    prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(0.01, 10))
     # prior.add_parameter('fsed_Na2S(s)_crystalline__DHS', dist=(0.01, 10))
     
-    prior.add_parameter('eq_scaling_MgSiO3(s)_amorphous__DHS', dist=(-10, 1))
-    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-10, 1))
-    prior.add_parameter('eq_scaling_Na2S(s)_crystalline__DHS', dist=(-10, 1))
+    prior.add_parameter('eq_scaling_MgSiO3(s)_amorphous__DHS', dist=(-5, 1))
+    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-5, 1))
+    # prior.add_parameter('eq_scaling_Na2S(s)_crystalline__DHS', dist=(-10, 1))
     
-    prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
+    prior.add_parameter('sigma_lnorm', dist=(1.05, 3))
     prior.add_parameter('log_kzz_cloud', dist=(4, 14))
 
     prior.add_parameter('corr_len_ch', dist=(-3, 0))
