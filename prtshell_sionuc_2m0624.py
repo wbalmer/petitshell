@@ -104,9 +104,9 @@ if __name__ == '__main__':
         'log_P_base_MgSiO3(s)_amorphous__DHS':0,
         'log_P_base_Fe(s)_crystalline__DHS':1,
         
-        'abund_SiO2(s)_amorphous__DHS':-5,
-        'abund_MgSiO3(s)_amorphous__DHS':-5,
-        'abund_Fe(s)_crystalline__DHS':-5,
+        # 'abund_SiO2(s)_amorphous__DHS':-5,
+        # 'abund_MgSiO3(s)_amorphous__DHS':-5,
+        # 'abund_Fe(s)_crystalline__DHS':-5,
 
         # 'eq_scaling_MgSiO3(s)_amorphous__DHS':0,
         # 'eq_scaling_Fe(s)_crystalline__DHS':0,
@@ -118,6 +118,8 @@ if __name__ == '__main__':
         'log_hansen_a_SiO2(s)_amorphous__DHS':0.0,
         'log_hansen_a_MgSiO3(s)_amorphous__DHS':0.0,
         'log_hansen_a_Fe(s)_crystalline__DHS':0.0,
+
+        # "patchiness":0.5
         
     }
 
@@ -347,13 +349,11 @@ if __name__ == '__main__':
                 cloud_f_sed[specie] = params['fsed']
             easy_chem_name = specie.split('_')[0].split('-')[0].split(".")[0]
 
-            cmf = return_cloud_mass_fraction(specie, feh, co_ratio)
-            if np.sum(cmf) == 0:
-                # try:
-                cmf = np.ones_like(cmf) * (10 ** params['abund_' + specie])
-                # except KeyError:
-                #     raise KeyError(f"Need explicit abundance because {specie} cloud isn't supported by return_cloud_mass_fraction")
-
+            if 'abund_' + specie in params.keys():
+                cmf = 10**params['abund_' + specie]
+            else:
+                cmf = return_cloud_mass_fraction(specie, feh, co_ratio) # try but might fail
+    
             if 'log_P_base_' + specie in params.keys():
                 cbases[easy_chem_name] = 10**params[f'log_P_base_{specie}']
             else:
@@ -376,6 +376,15 @@ if __name__ == '__main__':
                 mass_fractions_cloud *= (10 ** params['eq_scaling_' + specie]) # Scaled by a constant factor
                 
             mass_fractions[specie] = mass_fractions_cloud
+        
+        if "patchiness" in params.keys():
+            cloud_fraction = params["patchiness"]
+            complete_coverage_clouds = ['MgSiO3(s)_amorphous__DHS',
+                                        'Fe(s)_crystalline__DHS']
+        else:
+            cloud_fraction = None
+            complete_coverage_clouds = None
+        
             
         for species in line_species:
             easy_chem_name = species.split('_')[0].split('-')[0].split(".")[0]
@@ -404,8 +413,8 @@ if __name__ == '__main__':
             # cloud_f_sed=cloud_f_sed,
             cloud_hansen_a=cloud_hansen_as,
             cloud_hansen_b=cloud_hansen_bs,
-            # cloud_fraction=1.0,
-            # complete_coverage_clouds=None,
+            cloud_fraction=cloud_fraction,
+            complete_coverage_clouds=complete_coverage_clouds,
             return_contribution=False
         )
 
@@ -508,9 +517,9 @@ if __name__ == '__main__':
     prior.add_parameter('log_P_base_MgSiO3(s)_amorphous__DHS', dist=(-6, 3))
     prior.add_parameter('log_P_base_Fe(s)_crystalline__DHS', dist=(-6, 3))
     
-    prior.add_parameter('abund_SiO2(s)__DHS', dist=(-10, 0))
-    prior.add_parameter('abund_MgSiO3(s)_amorphous__DHS', dist=(-10, 0))
-    prior.add_parameter('abund_Fe(s)_crystalline__DHS', dist=(-10, 0))
+    # prior.add_parameter('abund_SiO2(s)__DHS', dist=(-10, 0))
+    # prior.add_parameter('abund_MgSiO3(s)_amorphous__DHS', dist=(-10, 0))
+    # prior.add_parameter('abund_Fe(s)_crystalline__DHS', dist=(-10, 0))
     
     prior.add_parameter('hansen_b_SiO2(s)__DHS', dist=(0.0, 0.5))
     prior.add_parameter('hansen_b_MgSiO3(s)_amorphous__DHS', dist=(0.0, 0.5))
@@ -520,16 +529,13 @@ if __name__ == '__main__':
     prior.add_parameter('log_hansen_a_MgSiO3(s)_amorphous__DHS', dist=(-3, 3))
     prior.add_parameter('log_hansen_a_Fe(s)_crystalline__DHS', dist=(-3, 3))
     
-    # prior.add_parameter('fsed', dist=(0.01, 10))
-    # prior.add_parameter('log_hansen_b', dist=(-2, 0))
-    # prior.add_parameter('sigma_cloud', dist=(1.005, 3))
-    # prior.add_parameter('log_kzz_cloud', dist=(4, 14))
+    # prior.add_parameter('patchiness', dist=(0, 1))
 
     # prior.add_parameter('corr_len', dist=(-3, 0))
     # prior.add_parameter('corr_amp', dist=(0, 1))
 
     # prior.add_parameter('rv', dist=(-1000, 1000))
-    # prior.add_parameter('e_hat', dist=loguniform(1, 1e2))
+    prior.add_parameter('e_hat', dist=loguniform(1, 1e2))
 
 
     n_live = 640
