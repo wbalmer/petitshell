@@ -46,7 +46,7 @@ from petitRADTRANS.chemistry.clouds import return_cloud_mass_fraction, simple_cd
 from petitRADTRANS.math import filter_spectrum_with_spline
 
 # general setup
-retrieval_name = '2M0624_SiO2TOP'
+retrieval_name = '2M0624_SiO2NUC'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 
@@ -96,26 +96,32 @@ if __name__ == '__main__':
         # 'log_pquench':0.0,
         'log_kzz_chem':10,
 
-        # 'fsed':4,
-        # 'sigma_lnorm':1.5,
+        'fsed_SiO2(s)_amorphous__DHS':2,
+        'fsed_MgSiO3(s)_amorphous__DHS':2,
+        'fsed_Fe(s)_crystalline__DHS':2,
 
-        # 'fsed_SiO2(s)_amorphous__DHS':0.2,
-        # 'fsed_MgSiO3(s)_amorphous__DHS':2,
-        # 'fsed_Fe(s)_crystalline__DHS':2,
-
-        # 'log_P_base_SiO2(s)__DHS':-4,
-        # 'abund_SiO2(s)_amorphous__DHS':-5,
+        'log_P_base_SiO2(s)__DHS':-4,
+        'log_P_base_MgSiO3(s)_amorphous__DHS':0,
+        'log_P_base_Fe(s)_crystalline__DHS':1,
         
+        'abund_SiO2(s)_amorphous__DHS':-5,
+        'abund_MgSiO3(s)_amorphous__DHS':-5,
+        'abund_Fe(s)_crystalline__DHS':-5,
+
         # 'eq_scaling_MgSiO3(s)_amorphous__DHS':0,
         # 'eq_scaling_Fe(s)_crystalline__DHS':0,
 
-        # 'hansen_b_SiO2(s)_amorphous__DHS':0.11,
-        # 'hansen_b_MgSiO3(s)_amorphous__DHS':0.11,
-        # 'hansen_b_Fe(s)_crystalline__DHS':0.11,
-        # 'log_kzz_cloud':10,
+        'hansen_b_SiO2(s)_amorphous__DHS':0.11,
+        'hansen_b_MgSiO3(s)_amorphous__DHS':0.11,
+        'hansen_b_Fe(s)_crystalline__DHS':0.11,
+
+        'log_hansen_a_SiO2(s)_amorphous__DHS':0.0,
+        'log_hansen_a_MgSiO3(s)_amorphous__DHS':0.0,
+        'log_hansen_a_Fe(s)_crystalline__DHS':0.0,
+        
     }
 
-    def likelihood(param_dict, debug=False):
+    def likelihood(param_dict, debug=True):
 
         ln = 0
 
@@ -330,16 +336,9 @@ if __name__ == '__main__':
             mass_fractions['13CO'] = mass_fractions['CO']/c_iso_ratio
             mass_fractions['12CO'] = mass_fractions['CO']-mass_fractions['13CO']
 
-        # cloud_particle_radius_distribution_std = params['sigma_cloud']
-        if 'log_kzz_cloud' in params.keys():
-            log_kzz_cloud = params['log_kzz_cloud']
-        else:
-            log_kzz_cloud = params['log_kzz_chem']
-
-        eddy_diffusion_coefficients = np.ones_like(temperature)*1e1**log_kzz_cloud
-
         cbases = {}
         cloud_f_sed = {}
+        cloud_hansen_as = {}
         cloud_hansen_bs = {}
         for specie in atmosphere.cloud_species:
             if 'fsed_' + specie in params.keys():
@@ -367,6 +366,11 @@ if __name__ == '__main__':
                 cloud_hansen_bs[specie] = params[f'hansen_b_{specie}'] * np.ones_like(pressures)
             else:
                 cloud_hansen_bs[specie] = params['hansen_b'] * np.ones_like(pressures)
+
+            if 'log_hansen_a_' + specie in params.keys():
+                cloud_hansen_as[specie] = 10**params[f'log_hansen_a_{specie}'] * np.ones_like(pressures)
+            else:
+                cloud_hansen_as[specie] = 10**params['log_hansen_a'] * np.ones_like(pressures)
             
             if "eq_scaling_" + specie in params.keys():
                 mass_fractions_cloud *= (10 ** params['eq_scaling_' + specie]) # Scaled by a constant factor
@@ -396,9 +400,9 @@ if __name__ == '__main__':
             mean_molar_masses=mean_molar_masses,
             reference_gravity=reference_gravity,
             cloud_particles_radius_distribution="hansen",
-            eddy_diffusion_coefficients=eddy_diffusion_coefficients,
-            cloud_f_sed=cloud_f_sed,
-            # cloud_particle_radius_distribution_std = cloud_particle_radius_distribution_std,
+            # eddy_diffusion_coefficients=eddy_diffusion_coefficients,
+            # cloud_f_sed=cloud_f_sed,
+            cloud_hansen_a=cloud_hansen_as,
             cloud_hansen_b=cloud_hansen_bs,
             # cloud_fraction=1.0,
             # complete_coverage_clouds=None,
@@ -425,9 +429,10 @@ if __name__ == '__main__':
                 mean_molar_masses=mean_molar_masses,
                 reference_gravity=reference_gravity,
                 cloud_particles_radius_distribution="hansen",
-                eddy_diffusion_coefficients=eddy_diffusion_coefficients,
-                cloud_f_sed=cloud_f_sed,
+                # eddy_diffusion_coefficients=eddy_diffusion_coefficients,
+                # cloud_f_sed=cloud_f_sed,
                 # cloud_particle_radius_distribution_std = cloud_particle_radius_distribution_std,
+                cloud_hansen_a=cloud_hansen_as,
                 cloud_hansen_b=cloud_hansen_bs,
                 # cloud_fraction=1.0,
                 # complete_coverage_clouds=None,
@@ -500,21 +505,25 @@ if __name__ == '__main__':
     prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-1, 10))
     
     prior.add_parameter('log_P_base_SiO2(s)__DHS', dist=(-6, 3))
-    # prior.add_parameter('P_base_MgSiO3(s)_amorphous__DHS', dist=(-6, 3))
-    # prior.add_parameter('P_base_Fe(s)_crystalline__DHS', dist=(-6, 3))
+    prior.add_parameter('log_P_base_MgSiO3(s)_amorphous__DHS', dist=(-6, 3))
+    prior.add_parameter('log_P_base_Fe(s)_crystalline__DHS', dist=(-6, 3))
     
     prior.add_parameter('abund_SiO2(s)__DHS', dist=(-10, 0))
-    prior.add_parameter('eq_scaling_MgSiO3(s)_amorphous__DHS', dist=(-5, 1))
-    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-5, 1))
+    prior.add_parameter('abund_MgSiO3(s)_amorphous__DHS', dist=(-10, 0))
+    prior.add_parameter('abund_Fe(s)_crystalline__DHS', dist=(-10, 0))
     
     prior.add_parameter('hansen_b_SiO2(s)__DHS', dist=(0.0, 0.5))
     prior.add_parameter('hansen_b_MgSiO3(s)_amorphous__DHS', dist=(0.0, 0.5))
     prior.add_parameter('hansen_b_Fe(s)_crystalline__DHS', dist=(0.0, 0.5))
+
+    prior.add_parameter('log_hansen_a_SiO2(s)__DHS', dist=(-3, 3))
+    prior.add_parameter('log_hansen_a_MgSiO3(s)_amorphous__DHS', dist=(-3, 3))
+    prior.add_parameter('log_hansen_a_Fe(s)_crystalline__DHS', dist=(-3, 3))
     
     # prior.add_parameter('fsed', dist=(0.01, 10))
     # prior.add_parameter('log_hansen_b', dist=(-2, 0))
     # prior.add_parameter('sigma_cloud', dist=(1.005, 3))
-    prior.add_parameter('log_kzz_cloud', dist=(4, 14))
+    # prior.add_parameter('log_kzz_cloud', dist=(4, 14))
 
     # prior.add_parameter('corr_len', dist=(-3, 0))
     # prior.add_parameter('corr_amp', dist=(0, 1))
