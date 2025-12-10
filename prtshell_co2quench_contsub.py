@@ -111,11 +111,11 @@ if __name__ == '__main__':
         'logg':5.0,
 
         'T_bottom':7000.,
-        'N_layers':6,
-        # 'dPT_10':0.02,
-        # 'dPT_9':0.02,
-        # 'dPT_8':0.02,
-        # 'dPT_7':0.06,
+        'N_layers':10,
+        'dPT_10':0.02,
+        'dPT_9':0.02,
+        'dPT_8':0.02,
+        'dPT_7':0.06,
         'dPT_6':0.10,
         'dPT_5':0.12,
         'dPT_4':0.15,
@@ -374,7 +374,7 @@ if __name__ == '__main__':
 
         return p_quench
 
-    def spectrum_generator(params, quench_co2_off_co=True, debug_abund=False, return_extras=False):
+    def spectrum_generator(params, quench_co2_off_co=True, return_extras=False):
         planet_radius = params['R_pl'] * cst.r_jup_mean
         parallax = params['plx']
         r2d2 = (planet_radius/(cst.pc/(parallax/1000)))**2
@@ -411,32 +411,20 @@ if __name__ == '__main__':
         co_ratios = co_ratio * np.ones_like(pressures)
         log10_metallicities = feh * np.ones_like(pressures)
 
+        mmw_init = np.ones_like(pressures) * 2.33
+
+        p_quench = kzz_to_co_pquench(temperature, pressures, mmw_init, reference_gravity, log_kzz_chem, log10_metallicities)
+
         mass_fractions, mean_molar_masses, nabla_ad = chem.interpolate_mass_fractions(
             co_ratios=co_ratios,
             log10_metallicities=log10_metallicities,
             temperatures=temperature,
             pressures=pressures,
+            carbon_pressure_quench=p_quench,
             full=True
         )
 
-        if debug_abund:
-            mf_eqchem = copy.deepcopy(mass_fractions)
-
-        p_quench = kzz_to_co_pquench(temperature, pressures, mean_molar_masses, reference_gravity, log_kzz_chem, log10_metallicities)
-
-        if p_quench is not None:
-
-            mass_fractions, mean_molar_masses, nabla_ad = chem.interpolate_mass_fractions(
-                co_ratios=co_ratios,
-                log10_metallicities=log10_metallicities,
-                temperatures=temperature,
-                pressures=pressures,
-                carbon_pressure_quench=p_quench,
-                full=True
-            )
-
-        if debug_abund:
-            mf_orig = copy.deepcopy(mass_fractions)
+        mmw = np.mean(mean_molar_masses)
 
         if quench_co2_off_co:
             if p_quench is not None:
@@ -467,46 +455,9 @@ if __name__ == '__main__':
             mass_fractions['13CO'] = co_total/c_iso_ratio
             mass_fractions['12CO'] = co_total-mass_fractions['13CO']
 
-        if debug_abund:
-            if '13CO' in line_species:
-                mf_list = ['H2', 'H2O', '12CO', '13CO', 'CH4', 'CO2']
-            else:
-                mf_list = ['H2', 'H2O', 'CO', 'CH4', 'CO2']
-            mf_colors = ['blue', 'red', 'green', 'orange', 'purple', 'yellow']
-            fig, ax = plt.subplots()
-            i = 0
-            for key in list(mass_fractions.keys()):
-                if key in mf_list:
-                    if key == 'CO2':
-                        ax.plot(mass_fractions[key], pressures, label=key, color='k', ls='--')
-                        ax.plot(mf_orig[key], pressures, color='k')
-                        ax.plot(mf_eqchem[key], pressures, color='k', alpha=0.5)
-                        if quench_co2_off_co:
-                            if p_quench is not None:
-                                ax.hlines(p_quench_co2, 1e-8, 9e-1, ls='--', color='tomato', label='P quench CO2')
-                    else:
-                        i += 1
-                        ax.plot(mass_fractions[key], pressures, label=key, ls='--', color=mf_colors[i])
-                        ax.plot(mf_orig[key], pressures, color=mf_colors[i])
-                        ax.plot(mf_eqchem[key], pressures, color=mf_colors[i], alpha=0.5)
-            if p_quench is not None:
-                ax.hlines(p_quench, 1e-8, 9e-1, ls='-', color='tomato', label='P quench CO-CH4-H2O')
-            ax.legend()
-            ax.set_xlim(1e-8, 9e-1)
-            ax.set_ylim(1e3, 1e-6)
-            ax.set_xscale('log')
-            ax.set_yscale('log')
-            plt.savefig(output_dir+'debug_abund_two.png')
-
-        sigma_lnorm = params['sigma_lnorm']
+        cloud_particle_radius_distribution_std = params['sigma_lnorm']
         log_kzz_cloud = params['log_kzz_cloud']
-
-        # mmw = params['mmw'] # we get mean_molar_masses from chem.interpolate instead of setting it ourselves
-        # mean_molar_masses = mmw * np.ones_like(temperature)
-        mmw = np.mean(mean_molar_masses)
-
         eddy_diffusion_coefficients = np.ones_like(temperature)*1e1**log_kzz_cloud
-        cloud_particle_radius_distribution_std = sigma_lnorm
 
         cbases = {}
         cloud_f_sed = {}
@@ -665,10 +616,10 @@ if __name__ == '__main__':
     # prior.add_parameter('dPT_4', dist=norm(loc=0.21, scale=0.05))
     # prior.add_parameter('dPT_5', dist=norm(loc=0.16, scale=0.06))
     # prior.add_parameter('dPT_6', dist=norm(loc=0.08, scale=0.025))
-    # prior.add_parameter('dPT_7', dist=norm(loc=0.06, scale=0.04))
-    # prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
-    # prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
-    # prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
+    prior.add_parameter('dPT_7', dist=norm(loc=0.06, scale=0.04))
+    prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
+    prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
+    prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
     
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
