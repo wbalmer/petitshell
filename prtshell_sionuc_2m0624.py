@@ -104,9 +104,9 @@ if __name__ == '__main__':
         'log_P_base_MgSiO3(s)_amorphous__DHS':0,
         'log_P_base_Fe(s)_crystalline__DHS':1,
         
-        # 'abund_SiO2(s)_amorphous__DHS':-5,
-        # 'abund_MgSiO3(s)_amorphous__DHS':-5,
-        # 'abund_Fe(s)_crystalline__DHS':-5,
+        'abund_SiO2(s)_amorphous__DHS':-5,
+        'abund_MgSiO3(s)_amorphous__DHS':-5,
+        'abund_Fe(s)_crystalline__DHS':-5,
 
         # 'eq_scaling_MgSiO3(s)_amorphous__DHS':0,
         # 'eq_scaling_Fe(s)_crystalline__DHS':0,
@@ -119,7 +119,7 @@ if __name__ == '__main__':
         'log_hansen_a_MgSiO3(s)_amorphous__DHS':0.0,
         'log_hansen_a_Fe(s)_crystalline__DHS':0.0,
 
-        # "patchiness":0.5
+        "patchiness":0.5
         
     }
 
@@ -382,7 +382,7 @@ if __name__ == '__main__':
             complete_coverage_clouds = ['MgSiO3(s)_amorphous__DHS',
                                         'Fe(s)_crystalline__DHS']
         else:
-            cloud_fraction = None
+            cloud_fraction = 1.0
             complete_coverage_clouds = None
         
             
@@ -517,9 +517,9 @@ if __name__ == '__main__':
     prior.add_parameter('log_P_base_MgSiO3(s)_amorphous__DHS', dist=(-6, 3))
     prior.add_parameter('log_P_base_Fe(s)_crystalline__DHS', dist=(-6, 3))
     
-    # prior.add_parameter('abund_SiO2(s)__DHS', dist=(-10, 0))
-    # prior.add_parameter('abund_MgSiO3(s)_amorphous__DHS', dist=(-10, 0))
-    # prior.add_parameter('abund_Fe(s)_crystalline__DHS', dist=(-10, 0))
+    prior.add_parameter('abund_SiO2(s)__DHS', dist=(-10, 0))
+    prior.add_parameter('abund_MgSiO3(s)_amorphous__DHS', dist=(-10, 0))
+    prior.add_parameter('abund_Fe(s)_crystalline__DHS', dist=(-10, 0))
     
     prior.add_parameter('hansen_b_SiO2(s)__DHS', dist=(0.0, 0.5))
     prior.add_parameter('hansen_b_MgSiO3(s)_amorphous__DHS', dist=(0.0, 0.5))
@@ -529,7 +529,7 @@ if __name__ == '__main__':
     prior.add_parameter('log_hansen_a_MgSiO3(s)_amorphous__DHS', dist=(-3, 3))
     prior.add_parameter('log_hansen_a_Fe(s)_crystalline__DHS', dist=(-3, 3))
     
-    # prior.add_parameter('patchiness', dist=(0, 1))
+    prior.add_parameter('patchiness', dist=(0, 1))
 
     # prior.add_parameter('corr_len', dist=(-3, 0))
     # prior.add_parameter('corr_amp', dist=(0, 1))
