@@ -50,7 +50,7 @@ from petitRADTRANS.fortran_convolve import fortran_convolve as fconvolve
 
 
 # general setup
-retrieval_name = 'hd47127b_shell_onesurface'
+retrieval_name = 'hd47127b_shell_twosurface'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 
@@ -173,6 +173,11 @@ if __name__ == '__main__':
                 elif "_B" in key:
                     key_b = key.split("_B")[0]
                     params_bd2[key_b] = param_dict[key]
+        if 'logg' not in params_bd1.keys():
+            if 'M_tot' and 'M_b' in param_dict.keys():
+                M_a = param_dict['M_tot'] - param_dict['M_b']
+                params_bd1['mass'] = M_a
+                params_bd2['mass'] = param_dict['M_b']
         
         if debug:
             print("params bd1 ")
@@ -210,7 +215,7 @@ if __name__ == '__main__':
             return -np.inf
         
         if debug:
-            plt.plot(nsw, frb_f_i, alpha=0.3, ls='--')
+            plt.plot(nsw, frb_f_i, color='red', ls='--')
 
         ln_ns = (
                 (nsf - frb_f_i)
@@ -225,7 +230,7 @@ if __name__ == '__main__':
             e_hat = 1
 
         ln_ns += np.nansum(
-            np.log(2.0 * np.pi * (fe*e_hat)**2)
+            np.log(2.0 * np.pi * (nsfe*e_hat)**2)
         )
 
         ln_ns *= -0.5
@@ -248,9 +253,9 @@ if __name__ == '__main__':
             
         if debug:
             plt.errorbar(w_i[1], f_i[1], marker='s', color='red')
-            plt.errorbar(w_i, pfs, yerr=pfes, marker='o', color='k')
+            plt.errorbar(w_i[1], pfs, yerr=pfes, marker='o', color='k')
             plt.savefig(output_dir+'temp_spec.png')
-            print(ln_ns, ln_p)
+            # print(ln_ns, ln_p)
         
         # print('done with likelihood calc')
 
@@ -628,14 +633,40 @@ if __name__ == '__main__':
             return wavelengths, flux
 
     if rank==0:
+        global_params = ['plx', 'C/O', 'Fe/H', 'C_iso', 'e_hat']
+
+        params_bd1 = {}
+        params_bd2 = {}
+        for key in default_params.keys():
+            if key in global_params:
+                params_bd1[key] = default_params[key]
+                params_bd2[key] = default_params[key]
+            else:
+                if "_A" in key:
+                    key_a = key.split("_A")[0]
+                    params_bd1[key_a] = default_params[key]
+                elif "_B" in key:
+                    key_b = key.split("_B")[0]
+                    params_bd2[key_b] = default_params[key]
+        
+        print("params bd1 ")
+        print(params_bd1)
+        print("params bd2 ")
+        print(params_bd2)
+    
         t_start = time.time()
-        test_w, test_f = spectrum_generator(default_params)
+        test_w, test_f_1 = spectrum_generator(params_bd1)
         t_end = time.time()
         print('First spectrum Generation time: {:.1f}s'.format(t_end - t_start))
+        test_w, test_f_2 = spectrum_generator(params_bd2)
+
+        test_f = test_f_1 + test_f_2
+        
         t_start = time.time()
         ln = likelihood(default_params)
         t_end = time.time()
         print('Likelihood time: {:.1f}s'.format(t_end - t_start))
+    
         g_test_f = filter_spectrum_with_spline(nsw,spectres(nsw, test_w[0], test_f[0]),x_nodes=x_nodes)
         plt.errorbar(nsw, nsf, yerr=nsfe, label='nirspec', color='k', ls='none')
         plt.plot(nsw, g_test_f, color='red')
@@ -646,79 +677,66 @@ if __name__ == '__main__':
 
     prior = Prior()
     
-    # mu_radius = 1.3
-    # sigma_radius = 0.1
-    # a_radius, b_radius = (0.75 - mu_radius) / sigma_radius, (2.0 - mu_radius) / sigma_radius
-    prior.add_parameter('R_pl', 
-                        dist=(0.5, 2.0)
-                        # dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius)
-                        )
-    
     mu_mass = 105
     sigma_mass = 25
     # mu_mass = 3.75
     # sigma_mass = 0.5
     a_mass, b_mass = (1 - mu_mass) / sigma_mass, (200.0 - mu_mass) / sigma_mass
-    prior.add_parameter('mass', dist=truncnorm(a_mass, b_mass, mu_mass, scale=sigma_mass))
-    
-    # prior.add_parameter('logg', dist=norm(loc=3.7, scale=0.1))
+    prior.add_parameter('M_tot', dist=truncnorm(a_mass, b_mass, mu_mass, scale=sigma_mass))
+    prior.add_parameter('M_b', dist=(1, 70))
     
     prior.add_parameter('plx', dist=norm(loc=7.561, scale=0.025)) # HD 47127 gaia
 
-
-    # gradient priors
-    # prior.add_parameter('T_bottom', dist=(2000, 20000))
-    # z23, combo of diff. grids from 10^-3 to 10^3
-    # prior.add_parameter('dPT_1', dist=norm(loc=0.25, scale=0.025))
-    # prior.add_parameter('dPT_2', dist=norm(loc=0.25, scale=0.045))
-    # prior.add_parameter('dPT_3', dist=norm(loc=0.26, scale=0.05))
-    # prior.add_parameter('dPT_4', dist=norm(loc=0.2, scale=0.05))
-    # prior.add_parameter('dPT_5', dist=norm(loc=0.12, scale=0.045))
-    # prior.add_parameter('dPT_6', dist=norm(loc=0.07, scale=0.07))
-
-    # z25, sonora diamondback for 2m1207b
-    # prior.add_parameter('dPT_1', dist=(0.05, 0.25)) # diamondback doesn't give P-T below 10^2 so ZJ adopted a uniform prior...
-    # prior.add_parameter('dPT_2', dist=norm(loc=0.15, scale=0.01))
-    # prior.add_parameter('dPT_3', dist=norm(loc=0.18, scale=0.04))
-    # prior.add_parameter('dPT_4', dist=norm(loc=0.21, scale=0.05))
-    # prior.add_parameter('dPT_5', dist=norm(loc=0.16, scale=0.06))
-    # prior.add_parameter('dPT_6', dist=norm(loc=0.08, scale=0.025))
-    # prior.add_parameter('dPT_7', dist=norm(loc=0.06, scale=0.04))
-    # prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
-    # prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
-    # prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
-
-    # molliere pt priors
-    prior.add_parameter('T3', dist=(0, 1))
-    prior.add_parameter('T2', dist=(0, 1))
-    prior.add_parameter('T1', dist=(0, 1))
-    prior.add_parameter('T_int', dist=(200, 2000))
-    prior.add_parameter('log_delta', dist=(0, 1))
-    prior.add_parameter('alpha', dist=(1, 2))
+    # mu_radius = 1.0
+    # sigma_radius = 0.1
+    # a_radius, b_radius = (0.75 - mu_radius) / sigma_radius, (2.0 - mu_radius) / sigma_radius
+    prior.add_parameter('R_pl_A', 
+                        dist=(0.5, 2.0)
+                        # dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius)
+                        )
+    
+    prior.add_parameter('R_pl_B', 
+                        dist=(0.5, 2.0)
+                        # dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius)
+                        )
     
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
     prior.add_parameter('C_iso', dist=(1,150))
 
-    prior.add_parameter('log_kzz_chem', dist=(-5, 25))
-
-    prior.add_parameter('fsed', dist=(0.01, 10))
-
-    # prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
-    # prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-4, 10))
-    
-    # prior.add_parameter('eq_scaling_Na2S(s)_crystalline__DHS', dist=(-3.5, 1))
-    # prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-3.5, 1))
-    # prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-3.5, 1))
-    
-    prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
-    prior.add_parameter('log_kzz_cloud', dist=(4, 14))
-
-    # prior.add_parameter('corr_len_ch', dist=(-3, 0))
-    # prior.add_parameter('corr_amp_ch', dist=(0, 1))
-
-    prior.add_parameter('rv', dist=(-1000, 1000))
     prior.add_parameter('e_hat', dist=loguniform(1, 1e2))
+
+
+    # A params
+    prior.add_parameter('T3_A', dist=(0, 1))
+    prior.add_parameter('T2_A', dist=(0, 1))
+    prior.add_parameter('T1_A', dist=(0, 1))
+    prior.add_parameter('T_int_A', dist=(200, 2000))
+    prior.add_parameter('log_delta_A', dist=(0, 1))
+    prior.add_parameter('alpha_A', dist=(1, 2))
+
+    prior.add_parameter('fsed_A', dist=(0.01, 10))
+    prior.add_parameter('sigma_lnorm_A', dist=(1.005, 3))
+    prior.add_parameter('log_kzz_cloud_A', dist=(4, 14))
+    prior.add_parameter('log_kzz_chem_A', dist=(-5, 25))
+
+    prior.add_parameter('rv_A', dist=(-1000, 1000))
+
+    # B params
+    prior.add_parameter('T3_B', dist=(0, 1))
+    prior.add_parameter('T2_B', dist=(0, 1))
+    prior.add_parameter('T1_B', dist=(0, 1))
+    prior.add_parameter('T_int_B', dist=(200, 2000))
+    prior.add_parameter('log_delta_B', dist=(0, 1))
+    prior.add_parameter('alpha_B', dist=(1, 2))
+
+    prior.add_parameter('fsed_B', dist=(0.01, 10))
+    prior.add_parameter('sigma_lnorm_B', dist=(1.005, 3))
+    prior.add_parameter('log_kzz_cloud_B', dist=(4, 14))
+    prior.add_parameter('log_kzz_chem_B', dist=(-5, 25))
+
+    prior.add_parameter('rv_B', dist=(-1000, 1000))
+
     # run the sampler!
     print(f'starting pool with {os.cpu_count()} cores')
     with mp.Pool(os.cpu_count()) as pool:
@@ -729,7 +747,7 @@ if __name__ == '__main__':
                           n_live=n_live,
                           filepath=checkpoint_file,
                           pool=pool,
-                          n_networks=4,
+                          n_networks=16,
                           resume=resume
                           )
         t_start = time.time()

@@ -182,7 +182,7 @@ if __name__ == '__main__':
             return -np.inf
         
         if debug:
-            plt.plot(nsw, frb_f_i, alpha=0.3, ls='--')
+            plt.plot(nsw, frb_f_i, color='red', ls='--')
 
         ln_ns = (
                 (nsf - frb_f_i)
@@ -220,9 +220,9 @@ if __name__ == '__main__':
             
         if debug:
             plt.errorbar(w_i[1], f_i[1], marker='s', color='red')
-            plt.errorbar(w_i, pfs, yerr=pfes, marker='o', color='k')
+            plt.errorbar(w_i[1], pfs, yerr=pfes, marker='o', color='k')
             plt.savefig(output_dir+'temp_spec.png')
-            print(ln_ns, ln_p)
+            # print(ln_ns, ln_p)
         
         # print('done with likelihood calc')
 
@@ -698,7 +698,7 @@ if __name__ == '__main__':
                           n_live=n_live,
                           filepath=checkpoint_file,
                           pool=pool,
-                          n_networks=4,
+                          n_networks=16,
                           resume=resume
                           )
         t_start = time.time()
