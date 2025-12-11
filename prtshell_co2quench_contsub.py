@@ -38,7 +38,7 @@ rank = comm.Get_rank()
 
 # prt specific imports
 from petitRADTRANS import physical_constants as cst
-from petitRADTRANS.physics import temperature_profile_function_guillot_global, dtdp_temperature_profile, frequency2wavelength
+from petitRADTRANS.physics import temperature_profile_function_guillot_global, dtdp_temperature_profile, temperature_profile_function_ret_model, frequency2wavelength
 from petitRADTRANS.radtrans import Radtrans # <--- this is our "spectrum generator," e.g. the radiative transfer solver
 from petitRADTRANS.chemistry.pre_calculated_chemistry import PreCalculatedEquilibriumChemistryTable
 from petitRADTRANS.chemistry.utils import mass_fractions2volume_mixing_ratios as mf2vmr
@@ -110,18 +110,25 @@ if __name__ == '__main__':
         'plx':7.5,
         'logg':5.0,
 
-        'T_bottom':7000.,
-        'N_layers':10,
-        'dPT_10':0.02,
-        'dPT_9':0.02,
-        'dPT_8':0.02,
-        'dPT_7':0.06,
-        'dPT_6':0.10,
-        'dPT_5':0.12,
-        'dPT_4':0.15,
-        'dPT_3':0.25,
-        'dPT_2':0.25,
-        'dPT_1':0.25,
+        # 'T_bottom':7000.,
+        # 'N_layers':10,
+        # 'dPT_10':0.02,
+        # 'dPT_9':0.02,
+        # 'dPT_8':0.02,
+        # 'dPT_7':0.06,
+        # 'dPT_6':0.10,
+        # 'dPT_5':0.12,
+        # 'dPT_4':0.15,
+        # 'dPT_3':0.25,
+        # 'dPT_2':0.25,
+        # 'dPT_1':0.25,
+
+        'T_int':1200,
+        'T1':0.5,
+        'T2':0.5,
+        'T3':0.5,
+        'log_delta':0.7,
+        'alpha':1.5,
 
         'C/O':0.55,
         'Fe/H':0.0,
@@ -386,28 +393,53 @@ if __name__ == '__main__':
             reference_gravity = 1e1**params['logg']
         
         pressures = atmosphere_nirspec.pressures * 1e-6 # cgs to bar
-
-        # gradient
-        t_bottom = params['T_bottom']
-        num_layer = params['N_layers']
-        layer_pt_slopes = np.ones(num_layer) * np.nan
-        for index in range(num_layer):
-            layer_pt_slopes[index] = params[f'dPT_{num_layer - index}']
-        if num_layer > 6:
-            top_press = -6
-        else:
-            top_press = -3
-        temperature = dtdp_temperature_profile(
-            pressures,
-            num_layer,
-            layer_pt_slopes,
-            t_bottom,
-            top_of_atmosphere_pressure=top_press,
-            bottom_of_atmosphere_pressure=3
-        )
-
         co_ratio = params['C/O']
         feh = params['Fe/H']
+
+        # gradient
+        # t_bottom = params['T_bottom']
+        # num_layer = params['N_layers']
+        # layer_pt_slopes = np.ones(num_layer) * np.nan
+        # for index in range(num_layer):
+        #     layer_pt_slopes[index] = params[f'dPT_{num_layer - index}']
+        # if num_layer > 6:
+        #     top_press = -6
+        # else:
+        #     top_press = -3
+        # temperature = dtdp_temperature_profile(
+        #     pressures,
+        #     num_layer,
+        #     layer_pt_slopes,
+        #     t_bottom,
+        #     top_of_atmosphere_pressure=top_press,
+        #     bottom_of_atmosphere_pressure=3
+        # )
+
+        # molliere 
+        t3 = params['T3']
+        t2 = params['T2']
+        t1 = params['T1']
+        intrinsic_temperature = params['T_int']
+        log_delta = params['log_delta']
+        alpha = params['alpha']
+        # Priors for these parameters are implemented here, as they depend on each other
+        t3 = ((3. / 4. * intrinsic_temperature ** 4. * (0.1 + 2. / 3.)) ** 0.25) * (1.0 - t3)
+        t2 = t3 * (1.0 - t2)
+        t1 = t2 * (1.0 - t1)
+        delta = ((10.0 ** (-3.0 + 5.0 * log_delta)) * 1e6) ** (-alpha)
+
+        rad_trans_params = [
+            np.array([t1,t2,t3]),
+            delta,
+            alpha,
+            intrinsic_temperature,
+            pressures,
+            True,
+            co_ratio,
+            feh
+        ]
+        temperature = temperature_profile_function_ret_model(rad_trans_params)
+
         log_kzz_chem = params['log_kzz_chem']
 
         co_ratios = co_ratio * np.ones_like(pressures)
@@ -602,14 +634,14 @@ if __name__ == '__main__':
     
     prior.add_parameter('plx', dist=norm(loc=7.561, scale=0.025)) # HD 47127 gaia
 
-    prior.add_parameter('T_bottom', dist=(2000, 20000))
+    # prior.add_parameter('T_bottom', dist=(2000, 20000))
     # z23, combo of diff. grids from 10^-3 to 10^3
-    prior.add_parameter('dPT_1', dist=norm(loc=0.25, scale=0.025))
-    prior.add_parameter('dPT_2', dist=norm(loc=0.25, scale=0.045))
-    prior.add_parameter('dPT_3', dist=norm(loc=0.26, scale=0.05))
-    prior.add_parameter('dPT_4', dist=norm(loc=0.2, scale=0.05))
-    prior.add_parameter('dPT_5', dist=norm(loc=0.12, scale=0.045))
-    prior.add_parameter('dPT_6', dist=norm(loc=0.07, scale=0.07))
+    # prior.add_parameter('dPT_1', dist=norm(loc=0.25, scale=0.025))
+    # prior.add_parameter('dPT_2', dist=norm(loc=0.25, scale=0.045))
+    # prior.add_parameter('dPT_3', dist=norm(loc=0.26, scale=0.05))
+    # prior.add_parameter('dPT_4', dist=norm(loc=0.2, scale=0.05))
+    # prior.add_parameter('dPT_5', dist=norm(loc=0.12, scale=0.045))
+    # prior.add_parameter('dPT_6', dist=norm(loc=0.07, scale=0.07))
 
     # z25, sonora diamondback for 2m1207b
     # prior.add_parameter('dPT_1', dist=(0.05, 0.25)) # diamondback doesn't give P-T below 10^2 so ZJ adopted a uniform prior...
@@ -618,23 +650,32 @@ if __name__ == '__main__':
     # prior.add_parameter('dPT_4', dist=norm(loc=0.21, scale=0.05))
     # prior.add_parameter('dPT_5', dist=norm(loc=0.16, scale=0.06))
     # prior.add_parameter('dPT_6', dist=norm(loc=0.08, scale=0.025))
-    prior.add_parameter('dPT_7', dist=norm(loc=0.06, scale=0.04))
-    prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
-    prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
-    prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
+    # prior.add_parameter('dPT_7', dist=norm(loc=0.06, scale=0.04))
+    # prior.add_parameter('dPT_8', dist=(-0.05, 0.1))
+    # prior.add_parameter('dPT_9', dist=(-0.05, 0.1))
+    # prior.add_parameter('dPT_10', dist=(-0.05, 0.1))
+
+    # molliere pt priors
+    prior.add_parameter('T3', dist=(0, 1))
+    prior.add_parameter('T2', dist=(0, 1))
+    prior.add_parameter('T1', dist=(0, 1))
+    prior.add_parameter('T_int', dist=(200, 2000))
+    prior.add_parameter('log_delta', dist=(0, 1))
+    prior.add_parameter('alpha', dist=(1, 2))
     
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
     prior.add_parameter('C_iso', dist=(1,150))
+
     prior.add_parameter('log_kzz_chem', dist=(-5, 25))
 
     prior.add_parameter('fsed', dist=(0.01, 10))
     # prior.add_parameter('fsed_MgSiO3(s)_crystalline__DHS', dist=(1e-4, 10))
     # prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(1e-4, 10))
     
-    prior.add_parameter('eq_scaling_Na2S(s)_crystalline__DHS', dist=(-3.5, 1))
-    prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-3.5, 1))
-    prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-3.5, 1))
+    # prior.add_parameter('eq_scaling_Na2S(s)_crystalline__DHS', dist=(-3.5, 1))
+    # prior.add_parameter('eq_scaling_MgSiO3(s)_crystalline__DHS', dist=(-3.5, 1))
+    # prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-3.5, 1))
     
     prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
     prior.add_parameter('log_kzz_cloud', dist=(4, 14))
