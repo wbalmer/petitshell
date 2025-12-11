@@ -133,7 +133,8 @@ if __name__ == '__main__':
 
         'e_hat': 2.0,
 
-        'rv':1,
+        'rv1':-10,
+        'rv2':+10,
         
         # 'corr_len_ch':-1, # log10 [-3, 0] 
         # 'corr_amp_ch':0.5 # [0, 1]

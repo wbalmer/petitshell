@@ -123,7 +123,7 @@ if __name__ == '__main__':
         
     }
 
-    def likelihood(param_dict, debug=True):
+    def likelihood(param_dict, debug=False):
 
         ln = 0
 
