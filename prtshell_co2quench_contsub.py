@@ -251,6 +251,7 @@ if __name__ == '__main__':
                     ] # these will be important for clouds
 
     nsmresl = '1e6' # lbl here
+    nirspec_model_resl = 10000
     atmosphere_nirspec = Radtrans(
         pressures = rtpressures,
         line_species = [i+f'.R{nsmresl}' for i in line_species],
@@ -258,7 +259,8 @@ if __name__ == '__main__':
         gas_continuum_contributors = gas_continuum_contributors, # these are important sources of opacity
         cloud_species = cloud_species, # these will be important for clouds
         wavelength_boundaries = [nsw[0]-0.05, nsw[-1]+0.05],
-        line_opacity_mode='lbl' # lbl or c-k
+        line_opacity_mode='lbl', # lbl or c-k
+        line_by_line_opacity_sampling = nirspec_model_resl,
     )
 
     # w_lbl = frequency2wavelength(atmosphere_nirspec._frequencies)*1e4
