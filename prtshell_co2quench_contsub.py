@@ -146,7 +146,7 @@ if __name__ == '__main__':
         # 'corr_amp_ch':0.5 # [0, 1]
     }
 
-    def likelihood(param_dict, debug=False):
+    def likelihood(param_dict, debug=True):
 
         ln = 0
 
@@ -177,6 +177,9 @@ if __name__ == '__main__':
         # subtract continuum
         frb_f_i = filter_spectrum_with_spline(nsw,cv_f_i,x_nodes=x_nodes)
         # print('continuum subtracted spectrum')
+
+        if np.isnan(np.sum(frb_f_i)):
+            return -np.inf
         
         if debug:
             plt.plot(nsw, frb_f_i, alpha=0.3, ls='--')
@@ -189,12 +192,12 @@ if __name__ == '__main__':
         # print('did the inverse')
         
         if 'e_hat' in params:
-            nsfe_i = nsfe * params['e_hat']
+            e_hat = params['e_hat']
         else:
-            nsfe_i = nsfe
+            e_hat = 1
 
         ln_ns += np.nansum(
-            np.log(2.0 * np.pi * nsfe_i**2)
+            np.log(2.0 * np.pi * (nsfe*e_hat)**2)
         )
 
         ln_ns *= -0.5
@@ -665,7 +668,7 @@ if __name__ == '__main__':
     
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
-    prior.add_parameter('C_iso', dist=(1,150))
+    prior.add_parameter('C_iso', dist=(1, 150))
 
     prior.add_parameter('log_kzz_chem', dist=(-5, 25))
 

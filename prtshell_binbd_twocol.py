@@ -106,44 +106,84 @@ if __name__ == '__main__':
     unit_conv = (u.erg/u.s/u.cm**2/u.cm).to(u.W/u.m**2/u.micron)
 
     default_params = {
-        'R_pl':1.0,
+
         'plx':7.5,
-        'logg':5.0,
-
-        'T_int':1200,
-        'T1':0.5,
-        'T2':0.5,
-        'T3':0.5,
-        'log_delta':0.7,
-        'alpha':1.5,
-
         'C/O':0.55,
         'Fe/H':0.0,
         'C_iso':100,
-        'log_kzz_chem':10,
-        'fsed':1,
-        'sigma_lnorm':1.5,
-        'log_kzz_cloud':10,
-
         'e_hat': 2.0,
 
-        'rv1':-10,
-        'rv2':+10,
+        # A
+        'R_pl_A':1.0,
+        'logg_A':5.0,
+
+        'T_int_A':1200,
+        'T1_A':0.5,
+        'T2_A':0.5,
+        'T3_A':0.5,
+        'log_delta_A':0.7,
+        'alpha_A':1.5,
+
+        'log_kzz_chem_A':10,
+        'fsed_A':1,
+        'sigma_lnorm_A':1.5,
+        'log_kzz_cloud_A':10,
+
+        'rv_A':-10,
+
+        # B
+        'R_pl_B':1.0,
+        'logg_B':5.0,
+
+        'T_int_B':1200,
+        'T1_B':0.5,
+        'T2_B':0.5,
+        'T3_B':0.5,
+        'log_delta_B':0.7,
+        'alpha_B':1.5,
+
+        'log_kzz_chem_B':10,
+        'fsed_B':1,
+        'sigma_lnorm_B':1.5,
+        'log_kzz_cloud_B':10,
         
-        # 'corr_len_ch':-1, # log10 [-3, 0] 
-        # 'corr_amp_ch':0.5 # [0, 1]
+        'rv_B':+10,
+        
     }
 
     def likelihood(param_dict, debug=False):
 
         ln = 0
 
-        params = default_params
-        for param in param_dict:
-            params[param] = param_dict[param]
+        # params = default_params
+        # for param in param_dict:
+        #     params[param] = param_dict[param]
+        global_params = ['plx', 'C/O', 'Fe/H', 'C_iso', 'e_hat']
 
-        w_i, f_i = spectrum_generator(params)
-        # print('generated spectrum')
+        params_bd1 = {}
+        params_bd2 = {}
+        for key in param_dict.keys():
+            if key in global_params:
+                params_bd1[key] = param_dict[key]
+                params_bd2[key] = param_dict[key]
+            else:
+                if "_A" in key:
+                    key_a = key.split("_A")[0]
+                    params_bd1[key_a] = param_dict[key]
+                elif "_B" in key:
+                    key_b = key.split("_B")[0]
+                    params_bd2[key_b] = param_dict[key]
+        
+        if debug:
+            print("params bd1 ")
+            print(params_bd1)
+            print("params bd2 ")
+            print(params_bd2)
+        
+        w_i, f_i_1 = spectrum_generator(params_bd1)
+        _, f_i_2 = spectrum_generator(params_bd2)
+
+        f_i = f_i_1 + f_i_2
 
         if debug:
             plt.figure()
@@ -165,6 +205,9 @@ if __name__ == '__main__':
         # subtract continuum
         frb_f_i = filter_spectrum_with_spline(nsw,cv_f_i,x_nodes=x_nodes)
         # print('continuum subtracted spectrum')
+
+        if np.isnan(np.sum(frb_f_i)):
+            return -np.inf
         
         if debug:
             plt.plot(nsw, frb_f_i, alpha=0.3, ls='--')
@@ -176,13 +219,13 @@ if __name__ == '__main__':
             )
         # print('did the inverse')
         
-        if 'e_hat' in params:
-            nsfe_i = nsfe * params['e_hat']
+        if 'e_hat' in params_bd1:
+            e_hat = params_bd1['e_hat']
         else:
-            nsfe_i = nsfe
+            e_hat = 1
 
         ln_ns += np.nansum(
-            np.log(2.0 * np.pi * nsfe_i**2)
+            np.log(2.0 * np.pi * (fe*e_hat)**2)
         )
 
         ln_ns *= -0.5
