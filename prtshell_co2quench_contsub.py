@@ -107,7 +107,7 @@ if __name__ == '__main__':
 
     default_params = {
         'R_pl':1.0,
-        'plx':7.5,
+        'plx':37.5,
         'logg':5.0,
 
         # 'T_bottom':7000.,
@@ -635,7 +635,7 @@ if __name__ == '__main__':
     
     # prior.add_parameter('logg', dist=norm(loc=3.7, scale=0.1))
     
-    prior.add_parameter('plx', dist=norm(loc=7.561, scale=0.025)) # HD 47127 gaia
+    prior.add_parameter('plx', dist=norm(loc=37.561, scale=0.025)) # HD 47127 gaia
 
     # prior.add_parameter('T_bottom', dist=(2000, 20000))
     # z23, combo of diff. grids from 10^-3 to 10^3

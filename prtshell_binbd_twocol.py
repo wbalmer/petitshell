@@ -107,7 +107,7 @@ if __name__ == '__main__':
 
     default_params = {
 
-        'plx':7.5,
+        'plx':37.5,
         'C/O':0.55,
         'Fe/H':0.0,
         'C_iso':100,
@@ -685,7 +685,7 @@ if __name__ == '__main__':
     prior.add_parameter('M_tot', dist=truncnorm(a_mass, b_mass, mu_mass, scale=sigma_mass))
     prior.add_parameter('M_b', dist=(1, 70))
     
-    prior.add_parameter('plx', dist=norm(loc=7.561, scale=0.025)) # HD 47127 gaia
+    prior.add_parameter('plx', dist=norm(loc=37.561, scale=0.025)) # HD 47127 gaia
 
     # mu_radius = 1.0
     # sigma_radius = 0.1
