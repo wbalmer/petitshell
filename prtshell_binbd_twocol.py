@@ -56,7 +56,7 @@ checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 
 # sampling parameters
 discard_exploration = False
-f_live = 0.01
+f_live = 0.05
 n_live = 1000
 resume = False
 plot = False
@@ -174,10 +174,12 @@ if __name__ == '__main__':
                     key_b = key.split("_B")[0]
                     params_bd2[key_b] = param_dict[key]
         if 'logg' not in params_bd1.keys():
-            if 'M_tot' and 'M_b' in param_dict.keys():
-                M_a = param_dict['M_tot'] - param_dict['M_b']
+            if 'M_tot' and 'M_ratio' in param_dict.keys():
+                # a over b, so A = tot-B
+                M_b = param_dict['M_tot']*param_dict['M_ratio']
+                M_a = param_dict['M_tot']-M_b
                 params_bd1['mass'] = M_a
-                params_bd2['mass'] = param_dict['M_b']
+                params_bd2['mass'] = M_b
         
         if debug:
             print("params bd1 ")
@@ -683,7 +685,7 @@ if __name__ == '__main__':
     # sigma_mass = 0.5
     a_mass, b_mass = (1 - mu_mass) / sigma_mass, (200.0 - mu_mass) / sigma_mass
     prior.add_parameter('M_tot', dist=truncnorm(a_mass, b_mass, mu_mass, scale=sigma_mass))
-    prior.add_parameter('M_b', dist=(1, 70))
+    prior.add_parameter('M_ratio', dist=(0, 0.5))
     
     prior.add_parameter('plx', dist=norm(loc=37.561, scale=0.025)) # HD 47127 gaia
 
