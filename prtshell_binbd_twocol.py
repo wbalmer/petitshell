@@ -689,31 +689,31 @@ if __name__ == '__main__':
     
     prior.add_parameter('plx', dist=norm(loc=37.561, scale=0.025)) # HD 47127 gaia
 
-    # mu_radius = 1.0
-    # sigma_radius = 0.1
-    # a_radius, b_radius = (0.75 - mu_radius) / sigma_radius, (2.0 - mu_radius) / sigma_radius
+    mu_radius = 1.0
+    sigma_radius = 0.1
+    a_radius, b_radius = (0.75 - mu_radius) / sigma_radius, (2.0 - mu_radius) / sigma_radius
     prior.add_parameter('R_pl_A', 
-                        dist=(0.5, 2.0)
-                        # dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius)
+                        # dist=(0.5, 2.0)
+                        dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius)
                         )
     
     prior.add_parameter('R_pl_B', 
-                        dist=(0.5, 2.0)
-                        # dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius)
+                        # dist=(0.5, 2.0)
+                        dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius)
                         )
     
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
     prior.add_parameter('C_iso', dist=(1,150))
 
-    prior.add_parameter('e_hat', dist=loguniform(1, 1e2))
+    # prior.add_parameter('e_hat', dist=loguniform(1, 1e2))
 
 
     # A params
     prior.add_parameter('T3_A', dist=(0, 1))
     prior.add_parameter('T2_A', dist=(0, 1))
     prior.add_parameter('T1_A', dist=(0, 1))
-    prior.add_parameter('T_int_A', dist=(200, 2000))
+    prior.add_parameter('T_int_A', dist=(500, 1000))
     prior.add_parameter('log_delta_A', dist=(0, 1))
     prior.add_parameter('alpha_A', dist=(1, 2))
 
@@ -722,13 +722,13 @@ if __name__ == '__main__':
     prior.add_parameter('log_kzz_cloud_A', dist=(4, 14))
     prior.add_parameter('log_kzz_chem_A', dist=(-5, 25))
 
-    prior.add_parameter('rv_A', dist=(-1000, 1000))
+    prior.add_parameter('rv_A', dist=(-30, 30))
 
     # B params
     prior.add_parameter('T3_B', dist=(0, 1))
     prior.add_parameter('T2_B', dist=(0, 1))
     prior.add_parameter('T1_B', dist=(0, 1))
-    prior.add_parameter('T_int_B', dist=(200, 2000))
+    prior.add_parameter('T_int_B', dist=(200, 1000))
     prior.add_parameter('log_delta_B', dist=(0, 1))
     prior.add_parameter('alpha_B', dist=(1, 2))
 
@@ -737,7 +737,7 @@ if __name__ == '__main__':
     prior.add_parameter('log_kzz_cloud_B', dist=(4, 14))
     prior.add_parameter('log_kzz_chem_B', dist=(-5, 25))
 
-    prior.add_parameter('rv_B', dist=(-1000, 1000))
+    prior.add_parameter('rv_B', dist=(30, 90))
 
     # run the sampler!
     print(f'starting pool with {os.cpu_count()} cores')

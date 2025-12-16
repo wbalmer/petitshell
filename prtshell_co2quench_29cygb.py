@@ -50,7 +50,7 @@ from petitRADTRANS.math import filter_spectrum_with_spline
 # general setup
 # retrieval_name = '29Cygb_shell_kzzchem_onecloud'
 # retrieval_name = '29Cygb_shell_kzzchem_threecloud_long'
-retrieval_name = '29Cygb_shell_kzzchem_amsilicate_twocloud'
+retrieval_name = '29Cygb_shell_kzzchem_amsilicate_1fsed_newphot'
 # retrieval_name = '29Cygb_shell_kzzchem'
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
@@ -165,46 +165,45 @@ if __name__ == '__main__':
             
         # do charis h-band likelihood on same model
         
-        rb_f_i = spectres(hw, w_i[0], f_i[0])
+        # rb_f_i = spectres(hw, w_i[0], f_i[0])
 
-        if 'corr_len_ch' in param_dict.keys():
-            # from Wang et al. 2020, species.fit.fit_model
-            wavel_j, wavel_i = np.meshgrid(hw, hw)
+        # if 'corr_len_ch' in param_dict.keys():
+        #     # from Wang et al. 2020, species.fit.fit_model
+        #     wavel_j, wavel_i = np.meshgrid(hw, hw)
 
-            error_j, error_i = np.meshgrid(hfe, hfe)
+        #     error_j, error_i = np.meshgrid(hfe, hfe)
 
-            corr_len = 10.0 ** param_dict["corr_len_ch"]  # (um)
-            corr_amp = param_dict["corr_amp_ch"]
+        #     corr_len = 10.0 ** param_dict["corr_len_ch"]  # (um)
+        #     corr_amp = param_dict["corr_amp_ch"]
 
-            cov_matrix = (
-                corr_amp**2
-                * error_i
-                * error_j
-                * np.exp(-((wavel_i - wavel_j) ** 2) / (2.0 * corr_len**2))
-                + (1.0 - corr_amp**2) * np.eye(hw.shape[0]) * error_i**2
-            )
+        #     cov_matrix = (
+        #         corr_amp**2
+        #         * error_i
+        #         * error_j
+        #         * np.exp(-((wavel_i - wavel_j) ** 2) / (2.0 * corr_len**2))
+        #         + (1.0 - corr_amp**2) * np.eye(hw.shape[0]) * error_i**2
+        #     )
 
-            ln_h = (
-                (hf - rb_f_i)
-                @ np.linalg.inv(cov_matrix)
-                @ (hf - rb_f_i)
-            )
+        #     ln_h = (
+        #         (hf - rb_f_i)
+        #         @ np.linalg.inv(cov_matrix)
+        #         @ (hf - rb_f_i)
+        #     )
 
-            ln_h += np.nansum(
-                np.log(2.0 * np.pi * hfe**2)
-            )
+        #     ln_h += np.nansum(
+        #         np.log(2.0 * np.pi * hfe**2)
+        #     )
 
-            ln_h *= -0.5
+        #     ln_h *= -0.5
 
-            ln += ln_h
+        #     ln += ln_h
         
-        else:
-            chi2 = np.nansum(((hf - rb_f_i)/hfe)**2)
-            ln += -chi2/2 - np.nansum(np.log(2*np.pi*hfe**2)/2)
+        # else:
+        #     chi2 = np.nansum(((hf - rb_f_i)/hfe)**2)
+        #     ln += -chi2/2 - np.nansum(np.log(2*np.pi*hfe**2)/2)
         
-        if debug:
-            plt.figure()
-            plt.plot(hw, rb_f_i)
+        # if debug:
+        #     plt.plot(hw, rb_f_i)
 
         # compute gravity likelihood
 
@@ -736,20 +735,20 @@ if __name__ == '__main__':
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
     prior.add_parameter('log_kzz_chem', dist=(-5, 25))
 
-    # prior.add_parameter('fsed', dist=(0.01, 10))
-    prior.add_parameter('fsed_MgSiO3(s)_amorphous__DHS', dist=(0.01, 10))
-    prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(0.01, 10))
+    prior.add_parameter('fsed', dist=(0.01, 10))
+    # prior.add_parameter('fsed_MgSiO3(s)_amorphous__DHS', dist=(0.01, 10))
+    # prior.add_parameter('fsed_Fe(s)_crystalline__DHS', dist=(0.01, 10))
     # prior.add_parameter('fsed_Na2S(s)_crystalline__DHS', dist=(0.01, 10))
     
     prior.add_parameter('eq_scaling_MgSiO3(s)_amorphous__DHS', dist=(-5, 1))
     prior.add_parameter('eq_scaling_Fe(s)_crystalline__DHS', dist=(-5, 1))
-    # prior.add_parameter('eq_scaling_Na2S(s)_crystalline__DHS', dist=(-10, 1))
+    prior.add_parameter('eq_scaling_Na2S(s)_crystalline__DHS', dist=(-10, 1))
     
     prior.add_parameter('sigma_lnorm', dist=(1.05, 3))
     prior.add_parameter('log_kzz_cloud', dist=(4, 14))
 
-    prior.add_parameter('corr_len_ch', dist=(-3, 0))
-    prior.add_parameter('corr_amp_ch', dist=(0, 1))
+    # prior.add_parameter('corr_len_ch', dist=(-3, 0))
+    # prior.add_parameter('corr_amp_ch', dist=(0, 1))
 
     # prior.add_parameter('rv', dist=(-1000, 1000))
 
