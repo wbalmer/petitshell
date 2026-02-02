@@ -54,9 +54,9 @@ from petitRADTRANS.fortran_convolve import fortran_convolve as fconvolve
 pmn = False
 
 if pmn:
-    retrieval_name = 'hd47127b_shell_twosurface_full_pmn'
+    retrieval_name = 'hd47127b_shell_onesurface_full_pmn'
 else:
-    retrieval_name = 'hd47127b_shell_twosurface_nautilus'
+    retrieval_name = 'hd47127b_shell_onesurface_nautilus'
 
 output_dir = retrieval_name+'_outputs/'
 checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
@@ -65,8 +65,8 @@ checkpoint_file = output_dir+f'checkpoint_{retrieval_name}.hdf5'
 discard_exploration = False
 f_live = 0.01
 n_live = 1000
-resume = False
-plot = False
+resume = True
+plot = True
 
 from pathlib import Path
 Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -127,43 +127,43 @@ if __name__ == '__main__':
         'C/O':0.55,
         'Fe/H':0.0,
         'C_iso':100,
-        'e_hat': 2.0,
+        'e_hat': 1.0,
 
         # A
-        'R_pl_A':1.0,
-        'logg_A':5.0,
+        'R_pl':1.0,
+        'logg':5.0,
 
-        'T_int_A':1200,
-        # 'T1_A':0.5,
-        # 'T2_A':0.5,
-        # 'T3_A':0.5,
-        'log_kappa_IR_A':0.7,
-        'gamma_A':1.5,
+        'T_int':1200,
+        # 'T1':0.5,
+        # 'T2':0.5,
+        # 'T3':0.5,
+        'log_kappa_IR':0.7,
+        'gamma':1.5,
 
-        'log_kzz_chem_A':10,
-        'fsed_A':1,
-        'sigma_lnorm_A':1.5,
-        'log_kzz_cloud_A':10,
+        'log_kzz_chem':10,
+        'fsed':1,
+        'sigma_lnorm':1.5,
+        'log_kzz_cloud':10,
 
-        'rv_A':-10,
+        'rv':-10,
 
         # B
-        'R_pl_B':1.0,
-        'logg_B':5.0,
+        # 'R_pl_B':1.0,
+        # 'logg_B':5.0,
 
-        'T_int_B':1200,
+        # 'T_int_B':1200,
         # 'T1_B':0.5,
         # 'T2_B':0.5,
         # 'T3_B':0.5,
-        'log_kappa_IR_B':0.7,
-        'gamma_B':1.5,
+        # 'log_kappa_IR_B':0.7,
+        # 'gamma_B':1.5,
 
-        'log_kzz_chem_B':10,
-        'fsed_B':1,
-        'sigma_lnorm_B':1.5,
-        'log_kzz_cloud_B':10,
+        # 'log_kzz_chem_B':10,
+        # 'fsed_B':1,
+        # 'sigma_lnorm_B':1.5,
+        # 'log_kzz_cloud_B':10,
         
-        'rv_B':+10,
+        # 'rv_B':+10,
         
     }
 
@@ -171,34 +171,9 @@ if __name__ == '__main__':
 
         ln = 0
 
-        # params = default_params
-        # for param in param_dict:
-        #     params[param] = param_dict[param]
-        global_params = ['plx', 'C/O', 'Fe/H', 'C_iso', 'e_hat']
-
-        # if debug:
-        #     print(param_dict)
-
-        params_bd1 = {}
-        params_bd2 = {}
-        for key in param_dict.keys():
-            if key in global_params:
-                params_bd1[key] = param_dict[key]
-                params_bd2[key] = param_dict[key]
-            else:
-                if "_A" in key:
-                    key_a = key.split("_A")[0]
-                    params_bd1[key_a] = param_dict[key]
-                elif "_B" in key:
-                    key_b = key.split("_B")[0]
-                    params_bd2[key_b] = param_dict[key]
-        if 'logg' not in params_bd1.keys():
-            if 'M_tot' and 'M_ratio' in param_dict.keys():
-                # a over b, so A = tot-B
-                M_b = param_dict['M_tot']*param_dict['M_ratio']
-                M_a = param_dict['M_tot']-M_b
-                params_bd1['mass'] = M_a
-                params_bd2['mass'] = M_b
+        params = default_params
+        for param in param_dict:
+            params[param] = param_dict[param]
         
         # if debug:
         #     print("params bd1 ")
@@ -206,10 +181,10 @@ if __name__ == '__main__':
         #     print("params bd2 ")
         #     print(params_bd2)
         
-        w_i, f_i_1 = spectrum_generator(params_bd1)
-        _, f_i_2 = spectrum_generator(params_bd2)
+        w_i, f_i = spectrum_generator(params)
+        # _, f_i_2 = spectrum_generator(params_bd2)
 
-        f_i = f_i_1 + f_i_2
+        # f_i = f_i_1 + f_i_2
 
         if debug:
             plt.figure(figsize=(9,3))
@@ -251,8 +226,8 @@ if __name__ == '__main__':
             )
         # print('did the inverse')
         
-        if 'e_hat' in params_bd1:
-            e_hat = params_bd1['e_hat']
+        if 'e_hat' in params:
+            e_hat = params['e_hat']
         else:
             e_hat = 1
 
@@ -322,7 +297,7 @@ if __name__ == '__main__':
                     ] # these will be important for clouds
 
     nsmresl = '1e6' # lbl here
-    nirspec_model_resl = 10000
+    nirspec_model_resl = 30000
     print('taking every '+str(int(float(nsmresl)/nirspec_model_resl))+"th lbl opacity")
     atmosphere_nirspec = Radtrans(
         pressures = rtpressures,
@@ -666,34 +641,29 @@ if __name__ == '__main__':
             return wavelengths, flux
 
     if rank==0:
-        global_params = ['plx', 'C/O', 'Fe/H', 'C_iso', 'e_hat']
 
         params_bd1 = {}
-        params_bd2 = {}
+        # params_bd2 = {}
         for key in default_params.keys():
-            if key in global_params:
-                params_bd1[key] = default_params[key]
-                params_bd2[key] = default_params[key]
-            else:
-                if "_A" in key:
-                    key_a = key.split("_A")[0]
-                    params_bd1[key_a] = default_params[key]
-                elif "_B" in key:
-                    key_b = key.split("_B")[0]
-                    params_bd2[key_b] = default_params[key]
+            params_bd1[key] = default_params[key]
+                
+            #     if "_A" in key:
+            #         key_a = key.split("_A")[0]
+            #         params_bd1[key_a] = default_params[key]
+            #     elif "_B" in key:
+            #         key_b = key.split("_B")[0]
+            #         params_bd2[key_b] = default_params[key]
         
         print("params bd1 ")
         print(params_bd1)
-        print("params bd2 ")
-        print(params_bd2)
     
         t_start = time.time()
-        test_w, test_f_1 = spectrum_generator(params_bd1)
+        test_w, test_f = spectrum_generator(params_bd1)
         t_end = time.time()
         print('First spectrum Generation time: {:.1f}s'.format(t_end - t_start))
-        test_w, test_f_2 = spectrum_generator(params_bd2)
+        # test_w, test_f_2 = spectrum_generator(params_bd2)
 
-        test_f = test_f_1 + test_f_2
+        # test_f = test_f_1 + test_f_2
         
         t_start = time.time()
         ln = likelihood(default_params)
@@ -715,23 +685,23 @@ if __name__ == '__main__':
     # mu_mass = 3.75
     # sigma_mass = 0.5
     a_mass, b_mass = (1 - mu_mass) / sigma_mass, (200.0 - mu_mass) / sigma_mass
-    prior.add_parameter('M_tot', dist=truncnorm(a_mass, b_mass, mu_mass, scale=sigma_mass))
-    prior.add_parameter('M_ratio', dist=(0.1, 0.5))
+    prior.add_parameter('mass', dist=truncnorm(a_mass, b_mass, mu_mass, scale=sigma_mass))
+    # prior.add_parameter('M_ratio', dist=(0.1, 0.5))
     
     prior.add_parameter('plx', dist=norm(loc=37.561, scale=0.025)) # HD 47127 gaia
 
     mu_radius = 1.0
     sigma_radius = 0.1
     a_radius, b_radius = (0.75 - mu_radius) / sigma_radius, (2.0 - mu_radius) / sigma_radius
-    prior.add_parameter('R_pl_A', 
+    prior.add_parameter('R_pl', 
                         # dist=(0.5, 2.0)
                         dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius)
                         )
     
-    prior.add_parameter('R_pl_B', 
-                        # dist=(0.5, 2.0)
-                        dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius)
-                        )
+    # prior.add_parameter('R_pl_B', 
+    #                     # dist=(0.5, 2.0)
+    #                     dist=truncnorm(a_radius, b_radius, loc=mu_radius, scale=sigma_radius)
+    #                     )
     
     prior.add_parameter('C/O', dist=(0.1, 1.0))
     prior.add_parameter('Fe/H', dist=(-0.5, 2.0))
@@ -744,31 +714,31 @@ if __name__ == '__main__':
     # prior.add_parameter('T3_A', dist=(0, 1))
     # prior.add_parameter('T2_A', dist=(0, 1))
     # prior.add_parameter('T1_A', dist=(0, 1))
-    prior.add_parameter('T_int_A', dist=(200, 1000))
-    prior.add_parameter('log_kappa_IR_A', dist=(-6, 8))
-    prior.add_parameter('gamma_A', dist=(10**-6, 10**8))
+    prior.add_parameter('T_int', dist=(200, 1000))
+    prior.add_parameter('log_kappa_IR', dist=(-6, 8))
+    prior.add_parameter('gamma', dist=(10**-6, 10**8))
 
-    prior.add_parameter('fsed_A', dist=(0.01, 10))
-    prior.add_parameter('sigma_lnorm_A', dist=(1.005, 3))
-    prior.add_parameter('log_kzz_cloud_A', dist=(4, 14))
-    prior.add_parameter('log_kzz_chem_A', dist=(-5, 25))
+    prior.add_parameter('fsed', dist=(0.01, 10))
+    prior.add_parameter('sigma_lnorm', dist=(1.005, 3))
+    prior.add_parameter('log_kzz_cloud', dist=(4, 14))
+    prior.add_parameter('log_kzz_chem', dist=(-5, 25))
 
-    prior.add_parameter('rv_A', dist=(-30, 30))
+    prior.add_parameter('rv', dist=(-100, 100))
 
     # B params
     # prior.add_parameter('T3_B', dist=(0, 1))
     # prior.add_parameter('T2_B', dist=(0, 1))
     # prior.add_parameter('T1_B', dist=(0, 1))
-    prior.add_parameter('T_int_B', dist=(200, 1000))
-    prior.add_parameter('log_kappa_IR_B', dist=(-6, 8))
-    prior.add_parameter('gamma_B', dist=(10**-6, 10**8))
+    # prior.add_parameter('T_int_B', dist=(200, 1000))
+    # prior.add_parameter('log_kappa_IR_B', dist=(-6, 8))
+    # prior.add_parameter('gamma_B', dist=(10**-6, 10**8))
 
-    prior.add_parameter('fsed_B', dist=(0.01, 10))
-    prior.add_parameter('sigma_lnorm_B', dist=(1.005, 3))
-    prior.add_parameter('log_kzz_cloud_B', dist=(4, 14))
-    prior.add_parameter('log_kzz_chem_B', dist=(-5, 25))
+    # prior.add_parameter('fsed_B', dist=(0.01, 10))
+    # prior.add_parameter('sigma_lnorm_B', dist=(1.005, 3))
+    # prior.add_parameter('log_kzz_cloud_B', dist=(4, 14))
+    # prior.add_parameter('log_kzz_chem_B', dist=(-5, 25))
 
-    prior.add_parameter('rv_B', dist=(30, 90))
+    # prior.add_parameter('rv_B', dist=(30, 90))
 
 
     def prior_pmn(cube, ndim, nparam):
@@ -886,40 +856,9 @@ if __name__ == '__main__':
         best_params[param] = best[i]
 
     if plot:
-        
-        global_params = ['plx', 'C/O', 'Fe/H', 'C_iso', 'e_hat']
 
-        params_bd1 = {}
-        params_bd2 = {}
-        for key in best_params.keys():
-            if key in global_params:
-                params_bd1[key] = best_params[key]
-                params_bd2[key] = best_params[key]
-            else:
-                if "_A" in key:
-                    key_a = key.split("_A")[0]
-                    params_bd1[key_a] = best_params[key]
-                elif "_B" in key:
-                    key_b = key.split("_B")[0]
-                    params_bd2[key_b] = best_params[key]
-        if 'logg' not in params_bd1.keys():
-            if 'M_tot' and 'M_ratio' in best_params.keys():
-                # a over b, so A = tot-B
-                M_b = best_params['M_tot']*best_params['M_ratio']
-                M_a = best_params['M_tot']-M_b
-                params_bd1['mass'] = M_a
-                params_bd2['mass'] = M_b
-        
-        print("params bd1 ")
-        print(params_bd1)
-        print("params bd2 ")
-        print(params_bd2)
     
-        test_w, test_f_1, _, _, p, t1, mfs1, contribution1 = spectrum_generator(params_bd1, quench_co2_off_co=True, return_extras=True)
-
-        test_w, test_f_2, _, _, p2, t2, mfs2, contribution2 = spectrum_generator(params_bd2, quench_co2_off_co=True, return_extras=True)
-
-        test_f = test_f_1 + test_f_2
+        test_w, test_f, _, _, p, t1, mfs1, contribution1 = spectrum_generator(best_params, quench_co2_off_co=True, return_extras=True)
 
         # resample to wl grid
         # rb_f_i = spectres(nsw, w_i[0], cv_f_i) # TODO: use frebin instead of spectres
@@ -935,20 +874,6 @@ if __name__ == '__main__':
         # subtract continuum
         frb_f_i = filter_spectrum_with_spline(nsw,cv_f_i,x_nodes=x_nodes)
         # print('continuum subtracted spectrum')
-        
-        plt.figure()
-        # plt.errorbar(nsw, nsf, yerr=nsfe, label='nirspec', color='k', ls='none')
-        # plt.errorbar(test_w[1], test_f[1], marker='s', color='red')
-        
-        plt.plot(test_w[0], test_f_1[0], label=ln, color='red')
-        # plt.errorbar(test_w[1], pfs, yerr=pfes, marker='o', color='k', label='photometry')
-
-        plt.plot(test_w[0], test_f_2[0], label=ln, color='blue')
-
-        # plt.plot(nsw, frb_f_i, label=ln, color='green')
-
-        plt.legend()
-        plt.savefig(output_dir+f'compare_twocol_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
 
         fig, axd = plt.subplot_mosaic(
             """
@@ -967,7 +892,7 @@ if __name__ == '__main__':
 
         axd['A'].errorbar(nsw, nsf, yerr=nsfe, marker='', color='k', ls='none', label='data')
         axd['A'].plot(nsw, frb_f_i, ls='-', label='model', color='cornflowerblue', alpha=0.5)
-        axd['A'].set_title('HD 33632 B highpass spectra G395H, pRT diseq. chem.')
+        axd['A'].set_title('HD 47127 B highpass spectra G395H, pRT diseq. chem.')
         axd['A'].legend(ncol=2, frameon=False, loc='upper right')
 
 
@@ -1030,7 +955,6 @@ if __name__ == '__main__':
         # plot p-T profile
         plt.figure()
         plt.plot(t1, p, color='r')
-        plt.plot(t2, p2, color='b')
         plt.yscale('log')
         plt.ylim(1e3, 1e-6)
         plt.savefig(output_dir+f'pt_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
@@ -1073,36 +997,6 @@ if __name__ == '__main__':
         
         
         # plot contribution function
-        
-        # Normalization
-        index = (contribution2 < 1e-16) & np.isnan(contribution2)
-        contribution2[index] = 1e-16
-
-        pressure_weights = np.diff(np.log10(p))
-        weights = np.ones_like(p)
-        weights[:-1] = pressure_weights
-        weights[-1] = weights[-2]
-        weights = weights / np.sum(weights)
-        weights = weights.reshape(len(weights), 1)
-
-        x, y = np.meshgrid(test_w[0], p)
-
-        fig, ax = plt.subplots()
-        
-        plot_cont = contribution2 / weights
-        label = "Weighted Flux"
-
-        im = ax.contourf(x,
-                            y,
-                            plot_cont,
-                            30, # n contour levels
-                            cmap='magma')
-        ax.set_xlabel("Wavelength [$\mu$m]")
-        ax.set_ylabel("Pressure [bar]")
-        ax.set_yscale("log")
-        ax.set_ylim(p[-1] * 1.03, p[0] / 1.03)
-        plt.colorbar(im, ax=ax, label=label)
-        plt.savefig(output_dir+f'contribution1_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
 
         # Normalization
         index = (contribution1 < 1e-16) & np.isnan(contribution1)
@@ -1132,5 +1026,5 @@ if __name__ == '__main__':
         ax.set_yscale("log")
         ax.set_ylim(p[-1] * 1.03, p[0] / 1.03)
         plt.colorbar(im, ax=ax, label=label)
-        plt.savefig(output_dir+f'contribution2_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
+        plt.savefig(output_dir+f'contribution1_{retrieval_name}.pdf', dpi=300, bbox_inches='tight')
 
