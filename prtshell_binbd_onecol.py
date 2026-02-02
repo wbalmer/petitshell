@@ -52,6 +52,7 @@ from petitRADTRANS.fortran_convolve import fortran_convolve as fconvolve
 # general setup
 
 pmn = False
+mpied = True
 
 if pmn:
     retrieval_name = 'hd47127b_shell_onesurface_full_pmn'
@@ -752,23 +753,40 @@ if __name__ == '__main__':
     if not pmn:
 
         # run the sampler!
-        print(f'starting pool with {os.cpu_count()} cores')
-        with mp.Pool(os.cpu_count()) as pool:
-        # print(f'starting pool with {size} processes')
-        # comm.Barrier()
-        # with MPIPool() as pool:
-            sampler = Sampler(prior, likelihood,
-                            n_live=n_live,
-                            filepath=checkpoint_file,
-                            pool=pool,
-                            n_networks=16,
-                            resume=resume
-                            )
-            t_start = time.time()
-            sampler.run(f_live=f_live, # default is 0.01, fract of evidence in live set before termination 
-                        discard_exploration=discard_exploration, # true for publication ready? fully unbiased
-                        verbose=True)
-            t_end = time.time()
+        if mpied:
+            print(f'starting pool with {size} processes')
+            comm.Barrier()
+            with MPIPool() as pool:
+                with mp.Pool(os.cpu_count()) as pool:
+        
+                sampler = Sampler(prior, likelihood,
+                                n_live=n_live,
+                                filepath=checkpoint_file,
+                                pool=pool,
+                                n_networks=16,
+                                resume=resume
+                                )
+                t_start = time.time()
+                sampler.run(f_live=f_live, # default is 0.01, fract of evidence in live set before termination 
+                            discard_exploration=discard_exploration, # true for publication ready? fully unbiased
+                            verbose=True)
+                t_end = time.time()
+        else:
+            print(f'starting pool with {os.cpu_count()} cores')
+            with mp.Pool(os.cpu_count()) as pool:
+        
+                sampler = Sampler(prior, likelihood,
+                                n_live=n_live,
+                                filepath=checkpoint_file,
+                                pool=pool,
+                                n_networks=16,
+                                resume=resume
+                                )
+                t_start = time.time()
+                sampler.run(f_live=f_live, # default is 0.01, fract of evidence in live set before termination 
+                            discard_exploration=discard_exploration, # true for publication ready? fully unbiased
+                            verbose=True)
+                t_end = time.time()
             
         if rank==0:
             print('Total time: {:.1f}s'.format(t_end - t_start))
@@ -854,6 +872,10 @@ if __name__ == '__main__':
     best_params = {}
     for i,param in enumerate(prior.keys):
         best_params[param] = best[i]
+        
+    if mpied:
+        if rank != 0:
+            plot = False
 
     if plot:
 

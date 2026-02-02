@@ -51,7 +51,7 @@ from petitRADTRANS.fortran_convolve import fortran_convolve as fconvolve
 
 # general setup
 
-pmn = False
+pmn = True
 
 if pmn:
     retrieval_name = 'hd47127b_shell_twosurface_full_pmn'
@@ -123,6 +123,8 @@ if __name__ == '__main__':
 
     default_params = {
 
+        'M_tot':105,
+        'M_ratio':0.45,
         'plx':37.5,
         'C/O':0.55,
         'Fe/H':0.0,
@@ -131,7 +133,7 @@ if __name__ == '__main__':
 
         # A
         'R_pl_A':1.0,
-        'logg_A':5.0,
+        # 'logg_A':5.0,
 
         'T_int_A':1200,
         # 'T1_A':0.5,
@@ -149,7 +151,7 @@ if __name__ == '__main__':
 
         # B
         'R_pl_B':1.0,
-        'logg_B':5.0,
+        # 'logg_B':5.0,
 
         'T_int_B':1200,
         # 'T1_B':0.5,
@@ -666,21 +668,29 @@ if __name__ == '__main__':
             return wavelengths, flux
 
     if rank==0:
+        param_dict = default_params
         global_params = ['plx', 'C/O', 'Fe/H', 'C_iso', 'e_hat']
 
         params_bd1 = {}
         params_bd2 = {}
-        for key in default_params.keys():
+        for key in param_dict.keys():
             if key in global_params:
-                params_bd1[key] = default_params[key]
-                params_bd2[key] = default_params[key]
+                params_bd1[key] = param_dict[key]
+                params_bd2[key] = param_dict[key]
             else:
                 if "_A" in key:
                     key_a = key.split("_A")[0]
-                    params_bd1[key_a] = default_params[key]
+                    params_bd1[key_a] = param_dict[key]
                 elif "_B" in key:
                     key_b = key.split("_B")[0]
-                    params_bd2[key_b] = default_params[key]
+                    params_bd2[key_b] = param_dict[key]
+        if 'logg' not in params_bd1.keys():
+            if 'M_tot' and 'M_ratio' in param_dict.keys():
+                # a over b, so A = tot-B
+                M_b = param_dict['M_tot']*param_dict['M_ratio']
+                M_a = param_dict['M_tot']-M_b
+                params_bd1['mass'] = M_a
+                params_bd2['mass'] = M_b
         
         print("params bd1 ")
         print(params_bd1)
@@ -701,7 +711,8 @@ if __name__ == '__main__':
         print('Likelihood time: {:.1f}s'.format(t_end - t_start))
     
         g_test_f = filter_spectrum_with_spline(nsw,spectres(nsw, test_w[0], test_f[0]),x_nodes=x_nodes)
-        plt.errorbar(nsw, nsf, yerr=nsfe, label='nirspec', color='k', ls='none')
+        plt.figure()
+        plt.errorbar(nsw, nsf, yerr=nsfe, label='nirspec', color='k', ls='none', marker='.', zorder=10)
         plt.plot(nsw, g_test_f, color='red')
         plt.errorbar(test_w[1], pfs, yerr=pfes, marker='o', color='k', label='photometry')
         plt.errorbar(test_w[1], test_f[1], marker='s', color='red')
@@ -716,7 +727,7 @@ if __name__ == '__main__':
     # sigma_mass = 0.5
     a_mass, b_mass = (1 - mu_mass) / sigma_mass, (200.0 - mu_mass) / sigma_mass
     prior.add_parameter('M_tot', dist=truncnorm(a_mass, b_mass, mu_mass, scale=sigma_mass))
-    prior.add_parameter('M_ratio', dist=(0.1, 0.5))
+    prior.add_parameter('M_ratio', dist=(0.05, 0.5))
     
     prior.add_parameter('plx', dist=norm(loc=37.561, scale=0.025)) # HD 47127 gaia
 
@@ -782,23 +793,39 @@ if __name__ == '__main__':
     if not pmn:
 
         # run the sampler!
-        print(f'starting pool with {os.cpu_count()} cores')
-        with mp.Pool(os.cpu_count()) as pool:
-        # print(f'starting pool with {size} processes')
-        # comm.Barrier()
-        # with MPIPool() as pool:
-            sampler = Sampler(prior, likelihood,
-                            n_live=n_live,
-                            filepath=checkpoint_file,
-                            pool=pool,
-                            n_networks=16,
-                            resume=resume
-                            )
-            t_start = time.time()
-            sampler.run(f_live=f_live, # default is 0.01, fract of evidence in live set before termination 
-                        discard_exploration=discard_exploration, # true for publication ready? fully unbiased
-                        verbose=True)
-            t_end = time.time()
+        if mpied:
+            print(f'starting pool with {size} processes')
+            comm.Barrier()
+            with MPIPool() as pool:
+        
+                sampler = Sampler(prior, likelihood,
+                                n_live=n_live,
+                                filepath=checkpoint_file,
+                                pool=pool,
+                                n_networks=16,
+                                resume=resume
+                                )
+                t_start = time.time()
+                sampler.run(f_live=f_live, # default is 0.01, fract of evidence in live set before termination 
+                            discard_exploration=discard_exploration, # true for publication ready? fully unbiased
+                            verbose=True)
+                t_end = time.time()
+        else:
+            print(f'starting pool with {os.cpu_count()} cores')
+            with mp.Pool(os.cpu_count()) as pool:
+        
+                sampler = Sampler(prior, likelihood,
+                                n_live=n_live,
+                                filepath=checkpoint_file,
+                                pool=pool,
+                                n_networks=16,
+                                resume=resume
+                                )
+                t_start = time.time()
+                sampler.run(f_live=f_live, # default is 0.01, fract of evidence in live set before termination 
+                            discard_exploration=discard_exploration, # true for publication ready? fully unbiased
+                            verbose=True)
+                t_end = time.time()
             
         if rank==0:
             print('Total time: {:.1f}s'.format(t_end - t_start))
@@ -884,6 +911,10 @@ if __name__ == '__main__':
     best_params = {}
     for i,param in enumerate(prior.keys):
         best_params[param] = best[i]
+        
+    if mpied:
+        if rank != 0:
+            plot = False
 
     if plot:
         
