@@ -52,9 +52,10 @@ from petitRADTRANS.fortran_convolve import fortran_convolve as fconvolve
 # general setup
 
 pmn = True
+mpied = True
 
 if pmn:
-    retrieval_name = 'hd47127b_shell_twosurface_full_pmn'
+    retrieval_name = 'hd47127b_shell_twosurface_full_rvsplit_pmn'
 else:
     retrieval_name = 'hd47127b_shell_twosurface_nautilus'
 
@@ -74,7 +75,7 @@ Path(output_dir).mkdir(parents=True, exist_ok=True)
 
 if __name__ == '__main__':
     # load data, start species
-    time.sleep(rank)
+    time.sleep(0.5*rank)
     SpeciesInit()
 
     data_path = './example_data/'
@@ -177,6 +178,11 @@ if __name__ == '__main__':
         # for param in param_dict:
         #     params[param] = param_dict[param]
         global_params = ['plx', 'C/O', 'Fe/H', 'C_iso', 'e_hat']
+        
+        # this is hacky, but just rejection sampling for sign of RV:
+        # that is, let "A" always be the body moving blueshifted towards us
+        if param_dict["rv_A"] > param_dict["rv_B"]:
+            return -np.inf
 
         # if debug:
         #     print(param_dict)
@@ -288,8 +294,11 @@ if __name__ == '__main__':
             # print(ln_ns, ln_p)
         
         # print('done with likelihood calc')
-
-        return ln
+        
+        if np.isnan(ln):
+            return -np.inf
+        else:
+            return ln
 
 
     chem = PreCalculatedEquilibriumChemistryTable()
@@ -764,13 +773,13 @@ if __name__ == '__main__':
     prior.add_parameter('log_kzz_cloud_A', dist=(4, 14))
     prior.add_parameter('log_kzz_chem_A', dist=(-5, 25))
 
-    prior.add_parameter('rv_A', dist=(-30, 30))
+    prior.add_parameter('rv_A', dist=(-100, 100))
 
     # B params
     # prior.add_parameter('T3_B', dist=(0, 1))
     # prior.add_parameter('T2_B', dist=(0, 1))
     # prior.add_parameter('T1_B', dist=(0, 1))
-    prior.add_parameter('T_int_B', dist=(200, 1000))
+    prior.add_parameter('T_int_B', dist=(100, 500))
     prior.add_parameter('log_kappa_IR_B', dist=(-6, 8))
     prior.add_parameter('gamma_B', dist=(10**-6, 10**8))
 
@@ -779,7 +788,7 @@ if __name__ == '__main__':
     prior.add_parameter('log_kzz_cloud_B', dist=(4, 14))
     prior.add_parameter('log_kzz_chem_B', dist=(-5, 25))
 
-    prior.add_parameter('rv_B', dist=(30, 90))
+    prior.add_parameter('rv_B', dist=(-100, 100))
 
 
     def prior_pmn(cube, ndim, nparam):
@@ -846,7 +855,8 @@ if __name__ == '__main__':
         
     else:
         import pymultinest
-
+        
+        comm.Barrier()
         pymultinest.run(
             likelihood_pmn,
             prior_pmn,
